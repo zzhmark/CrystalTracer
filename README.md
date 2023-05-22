@@ -11,7 +11,7 @@ trade-off between recall and accuracy.
 ## To install and build the cython modules
 
 ```bash
-pip install numpy==1.19 Cython findmaxima2d opencv-python matplotlib
+pip install numpy==1.19 Cython findmaxima2d opencv-python matplotlib pandas scikit-learn
 
 python setup.py build_ext --inplace
 ```

@@ -48,10 +48,9 @@ def backtrace(frames, page_look_back=3, dist_thr=30, nproc=8):
     trees = [KDTree([*zip(d['y'], d['x'])]) for d in frames]
     # start from the last frame
     arglist = []
-    passed_id = np.argwhere(frames[0]['filter']).reshape(-1)
-    for i in passed_id:
+    for i in range(len(frames[0])):
         arglist.append([i, trees, frames, page_look_back, dist_thr])
     with Pool(nproc) as p:
         res = p.starmap(trace_single, arglist)
     frames.reverse()
-    return dict(zip(passed_id, res))
+    return dict(zip(range(len(frames[0])), res))

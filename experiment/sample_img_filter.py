@@ -22,9 +22,8 @@ def extract_and_filter(zf, tmpd, name):
     p = Path(tmpd) / name
     res, flood = circle_filter(p)
     name = Path(name).name.split('_')[1]
-    # img = cv2.imread(str(p), cv2.IMREAD_GRAYSCALE)
-    # out = draw_areas(img, flood)
-    # cv2.imwrite(str(flood_folder / name), out)
+    with open((flood_folder / name).with_suffix('.pickle'), 'wb') as f:
+        pickle.dump(flood, f)
     pd.DataFrame(res).to_csv((detection_folder / name).with_suffix('.csv'), index=False)
     return name, res
 

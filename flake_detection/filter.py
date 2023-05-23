@@ -8,10 +8,11 @@ import numpy as np
 
 
 def circle_filter(img_path):
-    img = cv2.imread(str(img_path), cv2.IMREAD_GRAYSCALE)
-    # img = cv2.bilateralFilter(img, -1, 2, 2)
-    # smoothing & scaling
-    img = cv2.GaussianBlur(img, (3, 3), 0)
+    img: np.array = cv2.imread(str(img_path), cv2.IMREAD_GRAYSCALE)
+    m = np.quantile(img, 0.0001), np.quantile(img, 0.9999)
+    img = img.clip(m[0], m[1])
+    img = ((img - m[0]) / (m[1] - m[0]) * 255).astype(np.uint8)
+    img = cv2.bilateralFilter(img, -1, 10, 10)
 
     # distance transform and find centers
     thr = cv2.threshold(img, 0, 255, cv2.THRESH_TRIANGLE)[0]
@@ -24,16 +25,8 @@ def circle_filter(img_path):
     # y, x = merge_centers(img, y, x, 0.5, [i * 2 for i in rad])
 
     # detection
-    rad = radius_estimate(img, y, x, lowest_cutoff=thr, cutoff_ratio=0.5)
-    area, flood = area_estimate(img, y, x, rad, lowest_cutoff=thr, cutoff_ratio=0.5)
-    area_center = []
-    for i in range(len(y)):
-        pix = np.argwhere(flood == i)
-        ct = pix.mean(axis=0)
-        area_center.append(ct)
-    y = [c[0] for c in area_center]
-    x = [c[1] for c in area_center]
-    rad = radius_estimate(img, y, x, lowest_cutoff=thr, cutoff_ratio=0.5)
+    rad = radius_estimate(img, y, x, lowest_cutoff=thr, cutoff_ratio=0.2, bg_thr=0.0001)
+    area, flood = area_estimate(img, y, x, rad, lowest_cutoff=thr, cutoff_ratio=0.2)
 
     # # filter
     # tf = []

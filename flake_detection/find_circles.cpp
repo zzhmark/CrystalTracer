@@ -1441,6 +1441,23 @@ static Py_ssize_t __Pyx_minusones[] = { -1, -1, -1, -1, -1, -1, -1, -1 };
 static Py_ssize_t __Pyx_zeros[] = { 0, 0, 0, 0, 0, 0, 0, 0 };
 
 #define __Pyx_BufPtrStrided2d(type, buf, i0, s0, i1, s1) (type)((char*)buf + i0 * s0 + i1 * s1)
+/* ListCompAppend.proto */
+#if CYTHON_USE_PYLIST_INTERNALS && CYTHON_ASSUME_SAFE_MACROS
+static CYTHON_INLINE int __Pyx_ListComp_Append(PyObject* list, PyObject* x) {
+    PyListObject* L = (PyListObject*) list;
+    Py_ssize_t len = Py_SIZE(list);
+    if (likely(L->allocated > len)) {
+        Py_INCREF(x);
+        PyList_SET_ITEM(list, len, x);
+        __Pyx_SET_SIZE(list, len + 1);
+        return 0;
+    }
+    return PyList_Append(list, x);
+}
+#else
+#define __Pyx_ListComp_Append(L,x) PyList_Append(L,x)
+#endif
+
 /* PyThreadStateGet.proto */
 #if CYTHON_FAST_THREAD_STATE
 #define __Pyx_PyThreadState_declare  PyThreadState *__pyx_tstate;
@@ -1475,6 +1492,13 @@ static CYTHON_INLINE void __Pyx_ErrFetchInState(PyThreadState *tstate, PyObject 
 #define __Pyx_ErrFetchInState(tstate, type, value, tb)  PyErr_Fetch(type, value, tb)
 #define __Pyx_ErrRestore(type, value, tb)  PyErr_Restore(type, value, tb)
 #define __Pyx_ErrFetch(type, value, tb)  PyErr_Fetch(type, value, tb)
+#endif
+
+/* ObjectGetItem.proto */
+#if CYTHON_USE_TYPE_SLOTS
+static CYTHON_INLINE PyObject *__Pyx_PyObject_GetItem(PyObject *obj, PyObject* key);
+#else
+#define __Pyx_PyObject_GetItem(obj, key)  PyObject_GetItem(obj, key)
 #endif
 
 /* PyDictVersioning.proto */
@@ -1531,6 +1555,9 @@ static CYTHON_INLINE PyObject* __Pyx_PyObject_Call(PyObject *func, PyObject *arg
 #define __Pyx_PyObject_Call(func, arg, kw) PyObject_Call(func, arg, kw)
 #endif
 
+/* BufferFallbackError.proto */
+static void __Pyx_RaiseBufferFallbackError(void);
+
 /* PyCFunctionFastCall.proto */
 #if CYTHON_FAST_PYCCALL
 static CYTHON_INLINE PyObject *__Pyx_PyCFunction_FastCall(PyObject *func, PyObject **args, Py_ssize_t nargs);
@@ -1569,9 +1596,6 @@ static PyObject *__Pyx_PyFunction_FastCallDict(PyObject *func, PyObject **args, 
 #endif // CYTHON_FAST_PYCALL
 #endif
 
-/* PyObjectCall2Args.proto */
-static CYTHON_UNUSED PyObject* __Pyx_PyObject_Call2Args(PyObject* function, PyObject* arg1, PyObject* arg2);
-
 /* PyObjectCallMethO.proto */
 #if CYTHON_COMPILING_IN_CPYTHON
 static CYTHON_INLINE PyObject* __Pyx_PyObject_CallMethO(PyObject *func, PyObject *arg);
@@ -1579,6 +1603,26 @@ static CYTHON_INLINE PyObject* __Pyx_PyObject_CallMethO(PyObject *func, PyObject
 
 /* PyObjectCallOneArg.proto */
 static CYTHON_INLINE PyObject* __Pyx_PyObject_CallOneArg(PyObject *func, PyObject *arg);
+
+/* ListAppend.proto */
+#if CYTHON_USE_PYLIST_INTERNALS && CYTHON_ASSUME_SAFE_MACROS
+static CYTHON_INLINE int __Pyx_PyList_Append(PyObject* list, PyObject* x) {
+    PyListObject* L = (PyListObject*) list;
+    Py_ssize_t len = Py_SIZE(list);
+    if (likely(L->allocated > len) & likely(len > (L->allocated >> 1))) {
+        Py_INCREF(x);
+        PyList_SET_ITEM(list, len, x);
+        __Pyx_SET_SIZE(list, len + 1);
+        return 0;
+    }
+    return PyList_Append(list, x);
+}
+#else
+#define __Pyx_PyList_Append(L,x) PyList_Append(L,x)
+#endif
+
+/* PyObjectCall2Args.proto */
+static CYTHON_UNUSED PyObject* __Pyx_PyObject_Call2Args(PyObject* function, PyObject* arg1, PyObject* arg2);
 
 /* PyObjectCallNoArg.proto */
 #if CYTHON_COMPILING_IN_CPYTHON
@@ -1598,26 +1642,6 @@ static CYTHON_INLINE int __Pyx_IterFinish(void);
 
 /* UnpackItemEndCheck.proto */
 static int __Pyx_IternextUnpackEndCheck(PyObject *retval, Py_ssize_t expected);
-
-/* ListAppend.proto */
-#if CYTHON_USE_PYLIST_INTERNALS && CYTHON_ASSUME_SAFE_MACROS
-static CYTHON_INLINE int __Pyx_PyList_Append(PyObject* list, PyObject* x) {
-    PyListObject* L = (PyListObject*) list;
-    Py_ssize_t len = Py_SIZE(list);
-    if (likely(L->allocated > len) & likely(len > (L->allocated >> 1))) {
-        Py_INCREF(x);
-        PyList_SET_ITEM(list, len, x);
-        __Pyx_SET_SIZE(list, len + 1);
-        return 0;
-    }
-    return PyList_Append(list, x);
-}
-#else
-#define __Pyx_PyList_Append(L,x) PyList_Append(L,x)
-#endif
-
-/* BufferFallbackError.proto */
-static void __Pyx_RaiseBufferFallbackError(void);
 
 #define __Pyx_BufPtrStrided1d(type, buf, i0, s0) (type)((char*)buf + i0 * s0)
 /* py_abs.proto */
@@ -1665,23 +1689,6 @@ static int __Pyx_GetException(PyObject **type, PyObject **value, PyObject **tb);
 
 /* RaiseException.proto */
 static void __Pyx_Raise(PyObject *type, PyObject *value, PyObject *tb, PyObject *cause);
-
-/* ListCompAppend.proto */
-#if CYTHON_USE_PYLIST_INTERNALS && CYTHON_ASSUME_SAFE_MACROS
-static CYTHON_INLINE int __Pyx_ListComp_Append(PyObject* list, PyObject* x) {
-    PyListObject* L = (PyListObject*) list;
-    Py_ssize_t len = Py_SIZE(list);
-    if (likely(L->allocated > len)) {
-        Py_INCREF(x);
-        PyList_SET_ITEM(list, len, x);
-        __Pyx_SET_SIZE(list, len + 1);
-        return 0;
-    }
-    return PyList_Append(list, x);
-}
-#else
-#define __Pyx_ListComp_Append(L,x) PyList_Append(L,x)
-#endif
 
 /* TypeImport.proto */
 #ifndef __PYX_HAVE_RT_ImportType_proto
@@ -1985,9 +1992,9 @@ static PyTypeObject *__pyx_ptype_5numpy_ufunc = 0;
 
 /* Module declarations from 'flake_detection.find_circles' */
 static std::vector<int>  __pyx_convert_vector_from_py_int(PyObject *); /*proto*/
-static PyObject *__pyx_convert_vector_to_py_int(const std::vector<int>  &); /*proto*/
 static std::pair<int,int>  __pyx_convert_pair_from_py_int__and_int(PyObject *); /*proto*/
 static std::vector<std::pair<int,int> >  __pyx_convert_vector_from_py_std_3a__3a_pair_3c_int_2c_int_3e___(PyObject *); /*proto*/
+static PyObject *__pyx_convert_vector_to_py_int(const std::vector<int>  &); /*proto*/
 static std::vector<std::vector<int> >  __pyx_convert_vector_from_py_std_3a__3a_vector_3c_int_3e___(PyObject *); /*proto*/
 static __Pyx_TypeInfo __Pyx_TypeInfo_nn___pyx_t_5numpy_uint8_t = { "uint8_t", NULL, sizeof(__pyx_t_5numpy_uint8_t), { 0 }, 0, IS_UNSIGNED(__pyx_t_5numpy_uint8_t) ? 'U' : 'I', IS_UNSIGNED(__pyx_t_5numpy_uint8_t), 0 };
 static __Pyx_TypeInfo __Pyx_TypeInfo_nn___pyx_t_5numpy_int32_t = { "int32_t", NULL, sizeof(__pyx_t_5numpy_int32_t), { 0 }, 0, IS_UNSIGNED(__pyx_t_5numpy_int32_t) ? 'U' : 'I', IS_UNSIGNED(__pyx_t_5numpy_int32_t), 0 };
@@ -2014,9 +2021,14 @@ static const char __pyx_k_dx[] = "dx";
 static const char __pyx_k_dy[] = "dy";
 static const char __pyx_k_lc[] = "lc";
 static const char __pyx_k_np[] = "np";
+static const char __pyx_k_se[] = "se";
 static const char __pyx_k_sx[] = "sx";
 static const char __pyx_k_sy[] = "sy";
 static const char __pyx_k_tt[] = "tt";
+static const char __pyx_k_xe[] = "xe";
+static const char __pyx_k_xs[] = "xs";
+static const char __pyx_k_ye[] = "ye";
+static const char __pyx_k_ys[] = "ys";
 static const char __pyx_k_cv2[] = "cv2";
 static const char __pyx_k_gap[] = "gap";
 static const char __pyx_k_img[] = "img";
@@ -2029,6 +2041,7 @@ static const char __pyx_k_zip[] = "zip";
 static const char __pyx_k_area[] = "area";
 static const char __pyx_k_conn[] = "conn";
 static const char __pyx_k_copy[] = "copy";
+static const char __pyx_k_crop[] = "crop";
 static const char __pyx_k_data[] = "data";
 static const char __pyx_k_dire[] = "dire";
 static const char __pyx_k_flag[] = "flag";
@@ -2044,9 +2057,9 @@ static const char __pyx_k_y_py[] = "y_py";
 static const char __pyx_k_ans_x[] = "ans_x";
 static const char __pyx_k_ans_y[] = "ans_y";
 static const char __pyx_k_bg_th[] = "bg_th";
-static const char __pyx_k_disks[] = "disks";
 static const char __pyx_k_dtype[] = "dtype";
 static const char __pyx_k_flags[] = "flags";
+static const char __pyx_k_flood[] = "flood";
 static const char __pyx_k_numpy[] = "numpy";
 static const char __pyx_k_query[] = "query";
 static const char __pyx_k_range[] = "range";
@@ -2055,19 +2068,18 @@ static const char __pyx_k_width[] = "width";
 static const char __pyx_k_KDTree[] = "KDTree";
 static const char __pyx_k_bg_thr[] = "bg_thr";
 static const char __pyx_k_circle[] = "circle";
+static const char __pyx_k_floods[] = "floods";
 static const char __pyx_k_gap_py[] = "gap_py";
 static const char __pyx_k_height[] = "height";
 static const char __pyx_k_img_py[] = "img_py";
 static const char __pyx_k_import[] = "__import__";
 static const char __pyx_k_rad_py[] = "rad_py";
-static const char __pyx_k_argsort[] = "argsort";
 static const char __pyx_k_end_pos[] = "end_pos";
-static const char __pyx_k_visited[] = "visited";
 static const char __pyx_k_tot_cand[] = "tot_cand";
-static const char __pyx_k_ones_like[] = "ones_like";
 static const char __pyx_k_start_pos[] = "start_pos";
 static const char __pyx_k_transpose[] = "transpose";
 static const char __pyx_k_merge_dist[] = "merge_dist";
+static const char __pyx_k_zeros_like[] = "zeros_like";
 static const char __pyx_k_ImportError[] = "ImportError";
 static const char __pyx_k_current_node[] = "current_node";
 static const char __pyx_k_cutoff_ratio[] = "cutoff_ratio";
@@ -2088,7 +2100,6 @@ static PyObject *__pyx_n_s_ans_x;
 static PyObject *__pyx_n_s_ans_y;
 static PyObject *__pyx_n_s_area;
 static PyObject *__pyx_n_s_area_estimate;
-static PyObject *__pyx_n_s_argsort;
 static PyObject *__pyx_n_s_bg;
 static PyObject *__pyx_n_s_bg_th;
 static PyObject *__pyx_n_s_bg_thr;
@@ -2097,13 +2108,13 @@ static PyObject *__pyx_n_s_cline_in_traceback;
 static PyObject *__pyx_n_s_conn;
 static PyObject *__pyx_n_s_copy;
 static PyObject *__pyx_n_s_cr;
+static PyObject *__pyx_n_s_crop;
 static PyObject *__pyx_n_s_current_node;
 static PyObject *__pyx_n_s_cutoff_ratio;
 static PyObject *__pyx_n_s_cv2;
 static PyObject *__pyx_n_s_d;
 static PyObject *__pyx_n_s_data;
 static PyObject *__pyx_n_s_dire;
-static PyObject *__pyx_n_s_disks;
 static PyObject *__pyx_n_s_dtype;
 static PyObject *__pyx_n_s_dx;
 static PyObject *__pyx_n_s_dy;
@@ -2112,6 +2123,8 @@ static PyObject *__pyx_n_s_flag;
 static PyObject *__pyx_n_s_flags;
 static PyObject *__pyx_n_s_flake_detection_find_circles;
 static PyObject *__pyx_kp_s_flake_detection_find_circles_pyx;
+static PyObject *__pyx_n_s_flood;
+static PyObject *__pyx_n_s_floods;
 static PyObject *__pyx_n_s_gap;
 static PyObject *__pyx_n_s_gap_py;
 static PyObject *__pyx_n_s_height;
@@ -2131,7 +2144,6 @@ static PyObject *__pyx_n_s_np;
 static PyObject *__pyx_n_s_numpy;
 static PyObject *__pyx_kp_s_numpy_core_multiarray_failed_to;
 static PyObject *__pyx_kp_s_numpy_core_umath_failed_to_impor;
-static PyObject *__pyx_n_s_ones_like;
 static PyObject *__pyx_n_s_pos;
 static PyObject *__pyx_n_s_que;
 static PyObject *__pyx_n_s_query;
@@ -2141,6 +2153,7 @@ static PyObject *__pyx_n_s_rad;
 static PyObject *__pyx_n_s_rad_py;
 static PyObject *__pyx_n_s_radius_estimate;
 static PyObject *__pyx_n_s_range;
+static PyObject *__pyx_n_s_se;
 static PyObject *__pyx_n_s_shape;
 static PyObject *__pyx_n_s_sklearn_neighbors;
 static PyObject *__pyx_n_s_start_pos;
@@ -2155,14 +2168,18 @@ static PyObject *__pyx_n_s_tpos;
 static PyObject *__pyx_n_s_transpose;
 static PyObject *__pyx_n_s_tree;
 static PyObject *__pyx_n_s_tt;
-static PyObject *__pyx_n_s_visited;
 static PyObject *__pyx_n_s_vmax;
 static PyObject *__pyx_n_s_vmin;
 static PyObject *__pyx_n_s_width;
 static PyObject *__pyx_n_s_x;
 static PyObject *__pyx_n_s_x_py;
+static PyObject *__pyx_n_s_xe;
+static PyObject *__pyx_n_s_xs;
 static PyObject *__pyx_n_s_y;
 static PyObject *__pyx_n_s_y_py;
+static PyObject *__pyx_n_s_ye;
+static PyObject *__pyx_n_s_ys;
+static PyObject *__pyx_n_s_zeros_like;
 static PyObject *__pyx_n_s_zip;
 static PyObject *__pyx_pf_15flake_detection_12find_circles_radius_estimate(CYTHON_UNUSED PyObject *__pyx_self, PyObject *__pyx_v_img_py, PyObject *__pyx_v_y_py, PyObject *__pyx_v_x_py, PyObject *__pyx_v_cutoff_ratio, PyObject *__pyx_v_bg_thr, PyObject *__pyx_v_lowest_cutoff); /* proto */
 static PyObject *__pyx_pf_15flake_detection_12find_circles_2area_estimate(CYTHON_UNUSED PyObject *__pyx_self, PyObject *__pyx_v_img_py, PyObject *__pyx_v_y_py, PyObject *__pyx_v_x_py, PyObject *__pyx_v_rad_py, PyObject *__pyx_v_cutoff_ratio, PyObject *__pyx_v_lowest_cutoff); /* proto */
@@ -2358,6 +2375,7 @@ static PyObject *__pyx_pf_15flake_detection_12find_circles_radius_estimate(CYTHO
   int __pyx_t_18;
   int __pyx_t_19;
   int __pyx_t_20;
+  std::vector<int> ::iterator __pyx_t_21;
   int __pyx_lineno = 0;
   const char *__pyx_filename = NULL;
   int __pyx_clineno = 0;
@@ -2769,7 +2787,7 @@ static PyObject *__pyx_pf_15flake_detection_12find_circles_radius_estimate(CYTHO
  *             else:
  *                 continue             # <<<<<<<<<<<<<<
  *             break
- *     return rad
+ *     return [r * 1.2 for r in rad]
  */
         goto __pyx_L6_continue;
       }
@@ -2779,7 +2797,7 @@ static PyObject *__pyx_pf_15flake_detection_12find_circles_radius_estimate(CYTHO
  *             else:
  *                 continue
  *             break             # <<<<<<<<<<<<<<
- *     return rad
+ *     return [r * 1.2 for r in rad]
  * 
  */
       goto __pyx_L7_break;
@@ -2791,13 +2809,24 @@ static PyObject *__pyx_pf_15flake_detection_12find_circles_radius_estimate(CYTHO
   /* "flake_detection/find_circles.pyx":60
  *                 continue
  *             break
- *     return rad             # <<<<<<<<<<<<<<
+ *     return [r * 1.2 for r in rad]             # <<<<<<<<<<<<<<
  * 
  * 
  */
   __Pyx_XDECREF(__pyx_r);
-  __pyx_t_3 = __pyx_convert_vector_to_py_int(__pyx_v_rad); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 60, __pyx_L1_error)
+  __pyx_t_3 = PyList_New(0); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 60, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_3);
+  __pyx_t_21 = __pyx_v_rad.begin();
+  for (;;) {
+    if (!(__pyx_t_21 != __pyx_v_rad.end())) break;
+    __pyx_t_5 = *__pyx_t_21;
+    ++__pyx_t_21;
+    __pyx_v_r = __pyx_t_5;
+    __pyx_t_4 = PyFloat_FromDouble((__pyx_v_r * 1.2)); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 60, __pyx_L1_error)
+    __Pyx_GOTREF(__pyx_t_4);
+    if (unlikely(__Pyx_ListComp_Append(__pyx_t_3, (PyObject*)__pyx_t_4))) __PYX_ERR(0, 60, __pyx_L1_error)
+    __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
+  }
   __pyx_r = __pyx_t_3;
   __pyx_t_3 = 0;
   goto __pyx_L0;
@@ -2832,7 +2861,7 @@ static PyObject *__pyx_pf_15flake_detection_12find_circles_radius_estimate(CYTHO
   return __pyx_r;
 }
 
-/* "flake_detection/find_circles.pyx":68
+/* "flake_detection/find_circles.pyx":67
  * @cython.nonecheck(False)
  * 
  * def area_estimate(img_py, y_py, x_py, rad_py, cutoff_ratio=0.5, lowest_cutoff=0):             # <<<<<<<<<<<<<<
@@ -2890,19 +2919,19 @@ static PyObject *__pyx_pw_15flake_detection_12find_circles_3area_estimate(PyObje
         case  1:
         if (likely((values[1] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_y_py)) != 0)) kw_args--;
         else {
-          __Pyx_RaiseArgtupleInvalid("area_estimate", 0, 4, 6, 1); __PYX_ERR(0, 68, __pyx_L3_error)
+          __Pyx_RaiseArgtupleInvalid("area_estimate", 0, 4, 6, 1); __PYX_ERR(0, 67, __pyx_L3_error)
         }
         CYTHON_FALLTHROUGH;
         case  2:
         if (likely((values[2] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_x_py)) != 0)) kw_args--;
         else {
-          __Pyx_RaiseArgtupleInvalid("area_estimate", 0, 4, 6, 2); __PYX_ERR(0, 68, __pyx_L3_error)
+          __Pyx_RaiseArgtupleInvalid("area_estimate", 0, 4, 6, 2); __PYX_ERR(0, 67, __pyx_L3_error)
         }
         CYTHON_FALLTHROUGH;
         case  3:
         if (likely((values[3] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_rad_py)) != 0)) kw_args--;
         else {
-          __Pyx_RaiseArgtupleInvalid("area_estimate", 0, 4, 6, 3); __PYX_ERR(0, 68, __pyx_L3_error)
+          __Pyx_RaiseArgtupleInvalid("area_estimate", 0, 4, 6, 3); __PYX_ERR(0, 67, __pyx_L3_error)
         }
         CYTHON_FALLTHROUGH;
         case  4:
@@ -2918,7 +2947,7 @@ static PyObject *__pyx_pw_15flake_detection_12find_circles_3area_estimate(PyObje
         }
       }
       if (unlikely(kw_args > 0)) {
-        if (unlikely(__Pyx_ParseOptionalKeywords(__pyx_kwds, __pyx_pyargnames, 0, values, pos_args, "area_estimate") < 0)) __PYX_ERR(0, 68, __pyx_L3_error)
+        if (unlikely(__Pyx_ParseOptionalKeywords(__pyx_kwds, __pyx_pyargnames, 0, values, pos_args, "area_estimate") < 0)) __PYX_ERR(0, 67, __pyx_L3_error)
       }
     } else {
       switch (PyTuple_GET_SIZE(__pyx_args)) {
@@ -2943,7 +2972,7 @@ static PyObject *__pyx_pw_15flake_detection_12find_circles_3area_estimate(PyObje
   }
   goto __pyx_L4_argument_unpacking_done;
   __pyx_L5_argtuple_error:;
-  __Pyx_RaiseArgtupleInvalid("area_estimate", 0, 4, 6, PyTuple_GET_SIZE(__pyx_args)); __PYX_ERR(0, 68, __pyx_L3_error)
+  __Pyx_RaiseArgtupleInvalid("area_estimate", 0, 4, 6, PyTuple_GET_SIZE(__pyx_args)); __PYX_ERR(0, 67, __pyx_L3_error)
   __pyx_L3_error:;
   __Pyx_AddTraceback("flake_detection.find_circles.area_estimate", __pyx_clineno, __pyx_lineno, __pyx_filename);
   __Pyx_RefNannyFinishContext();
@@ -2959,14 +2988,11 @@ static PyObject *__pyx_pw_15flake_detection_12find_circles_3area_estimate(PyObje
 static PyObject *__pyx_pf_15flake_detection_12find_circles_2area_estimate(CYTHON_UNUSED PyObject *__pyx_self, PyObject *__pyx_v_img_py, PyObject *__pyx_v_y_py, PyObject *__pyx_v_x_py, PyObject *__pyx_v_rad_py, PyObject *__pyx_v_cutoff_ratio, PyObject *__pyx_v_lowest_cutoff) {
   int __pyx_v_tot_cand;
   int __pyx_v_i;
-  int __pyx_v_width;
-  int __pyx_v_height;
   float __pyx_v_cr;
   float __pyx_v_thr;
   float __pyx_v_lc;
   PyArrayObject *__pyx_v_img = 0;
-  PyArrayObject *__pyx_v_disks = 0;
-  PyArrayObject *__pyx_v_visited = 0;
+  PyArrayObject *__pyx_v_flood = 0;
   std::vector<int>  __pyx_v_y;
   std::vector<int>  __pyx_v_x;
   std::vector<int>  __pyx_v_area;
@@ -2975,42 +3001,53 @@ static PyObject *__pyx_pf_15flake_detection_12find_circles_2area_estimate(CYTHON
   std::queue<std::pair<int,int> >  __pyx_v_que;
   std::pair<int,int>  __pyx_v_t;
   std::pair<int,int>  __pyx_v_tt;
+  int __pyx_v_ys;
+  int __pyx_v_xs;
+  int __pyx_v_ye;
+  int __pyx_v_height;
+  int __pyx_v_width;
+  PyObject *__pyx_v_floods = NULL;
+  PyObject *__pyx_v_xe = NULL;
+  PyObject *__pyx_v_crop = NULL;
   std::pair<int,int>  __pyx_v_d;
-  __Pyx_LocalBuf_ND __pyx_pybuffernd_disks;
-  __Pyx_Buffer __pyx_pybuffer_disks;
+  __Pyx_LocalBuf_ND __pyx_pybuffernd_flood;
+  __Pyx_Buffer __pyx_pybuffer_flood;
   __Pyx_LocalBuf_ND __pyx_pybuffernd_img;
   __Pyx_Buffer __pyx_pybuffer_img;
-  __Pyx_LocalBuf_ND __pyx_pybuffernd_visited;
-  __Pyx_Buffer __pyx_pybuffer_visited;
   PyObject *__pyx_r = NULL;
   __Pyx_RefNannyDeclarations
   Py_ssize_t __pyx_t_1;
   Py_ssize_t __pyx_t_2;
   int __pyx_t_3;
   Py_ssize_t __pyx_t_4;
-  PyObject *__pyx_t_5 = NULL;
+  float __pyx_t_5;
   PyObject *__pyx_t_6 = NULL;
-  int __pyx_t_7;
-  float __pyx_t_8;
-  PyObject *__pyx_t_9 = NULL;
-  PyObject *__pyx_t_10 = NULL;
-  PyArrayObject *__pyx_t_11 = NULL;
-  std::vector<int>  __pyx_t_12;
-  std::vector<std::pair<int,int> >  __pyx_t_13;
-  PyObject *(*__pyx_t_14)(PyObject *);
-  PyObject *__pyx_t_15 = NULL;
+  std::vector<int>  __pyx_t_7;
+  std::vector<std::pair<int,int> >  __pyx_t_8;
+  int __pyx_t_9;
+  int __pyx_t_10;
+  int __pyx_t_11;
+  long __pyx_t_12;
+  long __pyx_t_13;
+  long __pyx_t_14;
+  npy_intp __pyx_t_15;
   PyObject *__pyx_t_16 = NULL;
-  PyObject *__pyx_t_17 = NULL;
+  int __pyx_t_17;
   PyObject *__pyx_t_18 = NULL;
-  int __pyx_t_19;
-  int __pyx_t_20;
-  std::pair<int,int>  __pyx_t_21;
-  Py_ssize_t __pyx_t_22;
-  Py_ssize_t __pyx_t_23;
-  std::vector<std::pair<int,int> > ::iterator __pyx_t_24;
-  int __pyx_t_25;
-  int __pyx_t_26;
-  int __pyx_t_27;
+  PyObject *__pyx_t_19 = NULL;
+  PyArrayObject *__pyx_t_20 = NULL;
+  PyObject *__pyx_t_21 = NULL;
+  PyObject *__pyx_t_22 = NULL;
+  PyObject *__pyx_t_23 = NULL;
+  std::pair<int,int>  __pyx_t_24;
+  PyObject *__pyx_t_25 = NULL;
+  PyObject *__pyx_t_26 = NULL;
+  std::vector<std::pair<int,int> > ::iterator __pyx_t_27;
+  int __pyx_t_28;
+  int __pyx_t_29;
+  Py_ssize_t __pyx_t_30;
+  Py_ssize_t __pyx_t_31;
+  int __pyx_t_32;
   int __pyx_lineno = 0;
   const char *__pyx_filename = NULL;
   int __pyx_clineno = 0;
@@ -3019,492 +3056,510 @@ static PyObject *__pyx_pf_15flake_detection_12find_circles_2area_estimate(CYTHON
   __pyx_pybuffer_img.refcount = 0;
   __pyx_pybuffernd_img.data = NULL;
   __pyx_pybuffernd_img.rcbuffer = &__pyx_pybuffer_img;
-  __pyx_pybuffer_disks.pybuffer.buf = NULL;
-  __pyx_pybuffer_disks.refcount = 0;
-  __pyx_pybuffernd_disks.data = NULL;
-  __pyx_pybuffernd_disks.rcbuffer = &__pyx_pybuffer_disks;
-  __pyx_pybuffer_visited.pybuffer.buf = NULL;
-  __pyx_pybuffer_visited.refcount = 0;
-  __pyx_pybuffernd_visited.data = NULL;
-  __pyx_pybuffernd_visited.rcbuffer = &__pyx_pybuffer_visited;
+  __pyx_pybuffer_flood.pybuffer.buf = NULL;
+  __pyx_pybuffer_flood.refcount = 0;
+  __pyx_pybuffernd_flood.data = NULL;
+  __pyx_pybuffernd_flood.rcbuffer = &__pyx_pybuffer_flood;
 
-  /* "flake_detection/find_circles.pyx":78
+  /* "flake_detection/find_circles.pyx":77
  *     :return:
  *     """
  *     assert len(x_py) == len(y_py) == len(rad_py)             # <<<<<<<<<<<<<<
  *     cdef:
- *         int tot_cand = len(y_py), i, j, k, width = img_py.shape[1], height = img_py.shape[0]
+ *         int tot_cand = len(y_py), i, j, k
  */
   #ifndef CYTHON_WITHOUT_ASSERTIONS
   if (unlikely(!Py_OptimizeFlag)) {
-    __pyx_t_1 = PyObject_Length(__pyx_v_x_py); if (unlikely(__pyx_t_1 == ((Py_ssize_t)-1))) __PYX_ERR(0, 78, __pyx_L1_error)
-    __pyx_t_2 = PyObject_Length(__pyx_v_y_py); if (unlikely(__pyx_t_2 == ((Py_ssize_t)-1))) __PYX_ERR(0, 78, __pyx_L1_error)
+    __pyx_t_1 = PyObject_Length(__pyx_v_x_py); if (unlikely(__pyx_t_1 == ((Py_ssize_t)-1))) __PYX_ERR(0, 77, __pyx_L1_error)
+    __pyx_t_2 = PyObject_Length(__pyx_v_y_py); if (unlikely(__pyx_t_2 == ((Py_ssize_t)-1))) __PYX_ERR(0, 77, __pyx_L1_error)
     __pyx_t_3 = (__pyx_t_1 == __pyx_t_2);
     if (__pyx_t_3) {
-      __pyx_t_4 = PyObject_Length(__pyx_v_rad_py); if (unlikely(__pyx_t_4 == ((Py_ssize_t)-1))) __PYX_ERR(0, 78, __pyx_L1_error)
+      __pyx_t_4 = PyObject_Length(__pyx_v_rad_py); if (unlikely(__pyx_t_4 == ((Py_ssize_t)-1))) __PYX_ERR(0, 77, __pyx_L1_error)
       __pyx_t_3 = (__pyx_t_2 == __pyx_t_4);
     }
     if (unlikely(!(__pyx_t_3 != 0))) {
       PyErr_SetNone(PyExc_AssertionError);
-      __PYX_ERR(0, 78, __pyx_L1_error)
+      __PYX_ERR(0, 77, __pyx_L1_error)
     }
   }
   #endif
 
-  /* "flake_detection/find_circles.pyx":80
+  /* "flake_detection/find_circles.pyx":79
  *     assert len(x_py) == len(y_py) == len(rad_py)
  *     cdef:
- *         int tot_cand = len(y_py), i, j, k, width = img_py.shape[1], height = img_py.shape[0]             # <<<<<<<<<<<<<<
+ *         int tot_cand = len(y_py), i, j, k             # <<<<<<<<<<<<<<
  *         float cr = cutoff_ratio, thr, lc = lowest_cutoff
  *         np.ndarray[np.uint8_t, ndim=2, cast=True] img = img_py
  */
-  __pyx_t_2 = PyObject_Length(__pyx_v_y_py); if (unlikely(__pyx_t_2 == ((Py_ssize_t)-1))) __PYX_ERR(0, 80, __pyx_L1_error)
+  __pyx_t_2 = PyObject_Length(__pyx_v_y_py); if (unlikely(__pyx_t_2 == ((Py_ssize_t)-1))) __PYX_ERR(0, 79, __pyx_L1_error)
   __pyx_v_tot_cand = __pyx_t_2;
-  __pyx_t_5 = __Pyx_PyObject_GetAttrStr(__pyx_v_img_py, __pyx_n_s_shape); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 80, __pyx_L1_error)
-  __Pyx_GOTREF(__pyx_t_5);
-  __pyx_t_6 = __Pyx_GetItemInt(__pyx_t_5, 1, long, 1, __Pyx_PyInt_From_long, 0, 0, 0); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 80, __pyx_L1_error)
-  __Pyx_GOTREF(__pyx_t_6);
-  __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
-  __pyx_t_7 = __Pyx_PyInt_As_int(__pyx_t_6); if (unlikely((__pyx_t_7 == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 80, __pyx_L1_error)
-  __Pyx_DECREF(__pyx_t_6); __pyx_t_6 = 0;
-  __pyx_v_width = __pyx_t_7;
-  __pyx_t_6 = __Pyx_PyObject_GetAttrStr(__pyx_v_img_py, __pyx_n_s_shape); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 80, __pyx_L1_error)
-  __Pyx_GOTREF(__pyx_t_6);
-  __pyx_t_5 = __Pyx_GetItemInt(__pyx_t_6, 0, long, 1, __Pyx_PyInt_From_long, 0, 0, 0); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 80, __pyx_L1_error)
-  __Pyx_GOTREF(__pyx_t_5);
-  __Pyx_DECREF(__pyx_t_6); __pyx_t_6 = 0;
-  __pyx_t_7 = __Pyx_PyInt_As_int(__pyx_t_5); if (unlikely((__pyx_t_7 == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 80, __pyx_L1_error)
-  __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
-  __pyx_v_height = __pyx_t_7;
 
-  /* "flake_detection/find_circles.pyx":81
+  /* "flake_detection/find_circles.pyx":80
  *     cdef:
- *         int tot_cand = len(y_py), i, j, k, width = img_py.shape[1], height = img_py.shape[0]
+ *         int tot_cand = len(y_py), i, j, k
  *         float cr = cutoff_ratio, thr, lc = lowest_cutoff             # <<<<<<<<<<<<<<
  *         np.ndarray[np.uint8_t, ndim=2, cast=True] img = img_py
- *         np.ndarray[np.int32_t, ndim=2] disks = np.ones_like(img_py, dtype=int) * -1, visited = np.ones_like(img_py, dtype=int) * -1
+ *         np.ndarray[np.int32_t, ndim=2] flood
  */
-  __pyx_t_8 = __pyx_PyFloat_AsFloat(__pyx_v_cutoff_ratio); if (unlikely((__pyx_t_8 == (float)-1) && PyErr_Occurred())) __PYX_ERR(0, 81, __pyx_L1_error)
-  __pyx_v_cr = __pyx_t_8;
-  __pyx_t_8 = __pyx_PyFloat_AsFloat(__pyx_v_lowest_cutoff); if (unlikely((__pyx_t_8 == (float)-1) && PyErr_Occurred())) __PYX_ERR(0, 81, __pyx_L1_error)
-  __pyx_v_lc = __pyx_t_8;
+  __pyx_t_5 = __pyx_PyFloat_AsFloat(__pyx_v_cutoff_ratio); if (unlikely((__pyx_t_5 == (float)-1) && PyErr_Occurred())) __PYX_ERR(0, 80, __pyx_L1_error)
+  __pyx_v_cr = __pyx_t_5;
+  __pyx_t_5 = __pyx_PyFloat_AsFloat(__pyx_v_lowest_cutoff); if (unlikely((__pyx_t_5 == (float)-1) && PyErr_Occurred())) __PYX_ERR(0, 80, __pyx_L1_error)
+  __pyx_v_lc = __pyx_t_5;
 
-  /* "flake_detection/find_circles.pyx":82
- *         int tot_cand = len(y_py), i, j, k, width = img_py.shape[1], height = img_py.shape[0]
+  /* "flake_detection/find_circles.pyx":81
+ *         int tot_cand = len(y_py), i, j, k
  *         float cr = cutoff_ratio, thr, lc = lowest_cutoff
  *         np.ndarray[np.uint8_t, ndim=2, cast=True] img = img_py             # <<<<<<<<<<<<<<
- *         np.ndarray[np.int32_t, ndim=2] disks = np.ones_like(img_py, dtype=int) * -1, visited = np.ones_like(img_py, dtype=int) * -1
+ *         np.ndarray[np.int32_t, ndim=2] flood
  *         vector[int] y = y_py, x = x_py, area = [1] * tot_cand, rad = rad_py
  */
-  if (!(likely(((__pyx_v_img_py) == Py_None) || likely(__Pyx_TypeTest(__pyx_v_img_py, __pyx_ptype_5numpy_ndarray))))) __PYX_ERR(0, 82, __pyx_L1_error)
-  __pyx_t_5 = __pyx_v_img_py;
-  __Pyx_INCREF(__pyx_t_5);
+  if (!(likely(((__pyx_v_img_py) == Py_None) || likely(__Pyx_TypeTest(__pyx_v_img_py, __pyx_ptype_5numpy_ndarray))))) __PYX_ERR(0, 81, __pyx_L1_error)
+  __pyx_t_6 = __pyx_v_img_py;
+  __Pyx_INCREF(__pyx_t_6);
   {
     __Pyx_BufFmt_StackElem __pyx_stack[1];
-    if (unlikely(__Pyx_GetBufferAndValidate(&__pyx_pybuffernd_img.rcbuffer->pybuffer, (PyObject*)((PyArrayObject *)__pyx_t_5), &__Pyx_TypeInfo_nn___pyx_t_5numpy_uint8_t, PyBUF_FORMAT| PyBUF_STRIDES, 2, 1, __pyx_stack) == -1)) {
+    if (unlikely(__Pyx_GetBufferAndValidate(&__pyx_pybuffernd_img.rcbuffer->pybuffer, (PyObject*)((PyArrayObject *)__pyx_t_6), &__Pyx_TypeInfo_nn___pyx_t_5numpy_uint8_t, PyBUF_FORMAT| PyBUF_STRIDES, 2, 1, __pyx_stack) == -1)) {
       __pyx_v_img = ((PyArrayObject *)Py_None); __Pyx_INCREF(Py_None); __pyx_pybuffernd_img.rcbuffer->pybuffer.buf = NULL;
-      __PYX_ERR(0, 82, __pyx_L1_error)
+      __PYX_ERR(0, 81, __pyx_L1_error)
     } else {__pyx_pybuffernd_img.diminfo[0].strides = __pyx_pybuffernd_img.rcbuffer->pybuffer.strides[0]; __pyx_pybuffernd_img.diminfo[0].shape = __pyx_pybuffernd_img.rcbuffer->pybuffer.shape[0]; __pyx_pybuffernd_img.diminfo[1].strides = __pyx_pybuffernd_img.rcbuffer->pybuffer.strides[1]; __pyx_pybuffernd_img.diminfo[1].shape = __pyx_pybuffernd_img.rcbuffer->pybuffer.shape[1];
     }
   }
-  __pyx_v_img = ((PyArrayObject *)__pyx_t_5);
-  __pyx_t_5 = 0;
+  __pyx_v_img = ((PyArrayObject *)__pyx_t_6);
+  __pyx_t_6 = 0;
 
   /* "flake_detection/find_circles.pyx":83
- *         float cr = cutoff_ratio, thr, lc = lowest_cutoff
  *         np.ndarray[np.uint8_t, ndim=2, cast=True] img = img_py
- *         np.ndarray[np.int32_t, ndim=2] disks = np.ones_like(img_py, dtype=int) * -1, visited = np.ones_like(img_py, dtype=int) * -1             # <<<<<<<<<<<<<<
- *         vector[int] y = y_py, x = x_py, area = [1] * tot_cand, rad = rad_py
- *         vector[pair[int, int]] dire = [(1, 0), (-1, 0), (0, 1), (0, -1)]
- */
-  __Pyx_GetModuleGlobalName(__pyx_t_5, __pyx_n_s_np); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 83, __pyx_L1_error)
-  __Pyx_GOTREF(__pyx_t_5);
-  __pyx_t_6 = __Pyx_PyObject_GetAttrStr(__pyx_t_5, __pyx_n_s_ones_like); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 83, __pyx_L1_error)
-  __Pyx_GOTREF(__pyx_t_6);
-  __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
-  __pyx_t_5 = PyTuple_New(1); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 83, __pyx_L1_error)
-  __Pyx_GOTREF(__pyx_t_5);
-  __Pyx_INCREF(__pyx_v_img_py);
-  __Pyx_GIVEREF(__pyx_v_img_py);
-  PyTuple_SET_ITEM(__pyx_t_5, 0, __pyx_v_img_py);
-  __pyx_t_9 = __Pyx_PyDict_NewPresized(1); if (unlikely(!__pyx_t_9)) __PYX_ERR(0, 83, __pyx_L1_error)
-  __Pyx_GOTREF(__pyx_t_9);
-  if (PyDict_SetItem(__pyx_t_9, __pyx_n_s_dtype, ((PyObject *)(&PyInt_Type))) < 0) __PYX_ERR(0, 83, __pyx_L1_error)
-  __pyx_t_10 = __Pyx_PyObject_Call(__pyx_t_6, __pyx_t_5, __pyx_t_9); if (unlikely(!__pyx_t_10)) __PYX_ERR(0, 83, __pyx_L1_error)
-  __Pyx_GOTREF(__pyx_t_10);
-  __Pyx_DECREF(__pyx_t_6); __pyx_t_6 = 0;
-  __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
-  __Pyx_DECREF(__pyx_t_9); __pyx_t_9 = 0;
-  __pyx_t_9 = PyNumber_Multiply(__pyx_t_10, __pyx_int_neg_1); if (unlikely(!__pyx_t_9)) __PYX_ERR(0, 83, __pyx_L1_error)
-  __Pyx_GOTREF(__pyx_t_9);
-  __Pyx_DECREF(__pyx_t_10); __pyx_t_10 = 0;
-  if (!(likely(((__pyx_t_9) == Py_None) || likely(__Pyx_TypeTest(__pyx_t_9, __pyx_ptype_5numpy_ndarray))))) __PYX_ERR(0, 83, __pyx_L1_error)
-  __pyx_t_11 = ((PyArrayObject *)__pyx_t_9);
-  {
-    __Pyx_BufFmt_StackElem __pyx_stack[1];
-    if (unlikely(__Pyx_GetBufferAndValidate(&__pyx_pybuffernd_disks.rcbuffer->pybuffer, (PyObject*)__pyx_t_11, &__Pyx_TypeInfo_nn___pyx_t_5numpy_int32_t, PyBUF_FORMAT| PyBUF_STRIDES, 2, 0, __pyx_stack) == -1)) {
-      __pyx_v_disks = ((PyArrayObject *)Py_None); __Pyx_INCREF(Py_None); __pyx_pybuffernd_disks.rcbuffer->pybuffer.buf = NULL;
-      __PYX_ERR(0, 83, __pyx_L1_error)
-    } else {__pyx_pybuffernd_disks.diminfo[0].strides = __pyx_pybuffernd_disks.rcbuffer->pybuffer.strides[0]; __pyx_pybuffernd_disks.diminfo[0].shape = __pyx_pybuffernd_disks.rcbuffer->pybuffer.shape[0]; __pyx_pybuffernd_disks.diminfo[1].strides = __pyx_pybuffernd_disks.rcbuffer->pybuffer.strides[1]; __pyx_pybuffernd_disks.diminfo[1].shape = __pyx_pybuffernd_disks.rcbuffer->pybuffer.shape[1];
-    }
-  }
-  __pyx_t_11 = 0;
-  __pyx_v_disks = ((PyArrayObject *)__pyx_t_9);
-  __pyx_t_9 = 0;
-  __Pyx_GetModuleGlobalName(__pyx_t_9, __pyx_n_s_np); if (unlikely(!__pyx_t_9)) __PYX_ERR(0, 83, __pyx_L1_error)
-  __Pyx_GOTREF(__pyx_t_9);
-  __pyx_t_10 = __Pyx_PyObject_GetAttrStr(__pyx_t_9, __pyx_n_s_ones_like); if (unlikely(!__pyx_t_10)) __PYX_ERR(0, 83, __pyx_L1_error)
-  __Pyx_GOTREF(__pyx_t_10);
-  __Pyx_DECREF(__pyx_t_9); __pyx_t_9 = 0;
-  __pyx_t_9 = PyTuple_New(1); if (unlikely(!__pyx_t_9)) __PYX_ERR(0, 83, __pyx_L1_error)
-  __Pyx_GOTREF(__pyx_t_9);
-  __Pyx_INCREF(__pyx_v_img_py);
-  __Pyx_GIVEREF(__pyx_v_img_py);
-  PyTuple_SET_ITEM(__pyx_t_9, 0, __pyx_v_img_py);
-  __pyx_t_5 = __Pyx_PyDict_NewPresized(1); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 83, __pyx_L1_error)
-  __Pyx_GOTREF(__pyx_t_5);
-  if (PyDict_SetItem(__pyx_t_5, __pyx_n_s_dtype, ((PyObject *)(&PyInt_Type))) < 0) __PYX_ERR(0, 83, __pyx_L1_error)
-  __pyx_t_6 = __Pyx_PyObject_Call(__pyx_t_10, __pyx_t_9, __pyx_t_5); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 83, __pyx_L1_error)
-  __Pyx_GOTREF(__pyx_t_6);
-  __Pyx_DECREF(__pyx_t_10); __pyx_t_10 = 0;
-  __Pyx_DECREF(__pyx_t_9); __pyx_t_9 = 0;
-  __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
-  __pyx_t_5 = PyNumber_Multiply(__pyx_t_6, __pyx_int_neg_1); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 83, __pyx_L1_error)
-  __Pyx_GOTREF(__pyx_t_5);
-  __Pyx_DECREF(__pyx_t_6); __pyx_t_6 = 0;
-  if (!(likely(((__pyx_t_5) == Py_None) || likely(__Pyx_TypeTest(__pyx_t_5, __pyx_ptype_5numpy_ndarray))))) __PYX_ERR(0, 83, __pyx_L1_error)
-  __pyx_t_11 = ((PyArrayObject *)__pyx_t_5);
-  {
-    __Pyx_BufFmt_StackElem __pyx_stack[1];
-    if (unlikely(__Pyx_GetBufferAndValidate(&__pyx_pybuffernd_visited.rcbuffer->pybuffer, (PyObject*)__pyx_t_11, &__Pyx_TypeInfo_nn___pyx_t_5numpy_int32_t, PyBUF_FORMAT| PyBUF_STRIDES| PyBUF_WRITABLE, 2, 0, __pyx_stack) == -1)) {
-      __pyx_v_visited = ((PyArrayObject *)Py_None); __Pyx_INCREF(Py_None); __pyx_pybuffernd_visited.rcbuffer->pybuffer.buf = NULL;
-      __PYX_ERR(0, 83, __pyx_L1_error)
-    } else {__pyx_pybuffernd_visited.diminfo[0].strides = __pyx_pybuffernd_visited.rcbuffer->pybuffer.strides[0]; __pyx_pybuffernd_visited.diminfo[0].shape = __pyx_pybuffernd_visited.rcbuffer->pybuffer.shape[0]; __pyx_pybuffernd_visited.diminfo[1].strides = __pyx_pybuffernd_visited.rcbuffer->pybuffer.strides[1]; __pyx_pybuffernd_visited.diminfo[1].shape = __pyx_pybuffernd_visited.rcbuffer->pybuffer.shape[1];
-    }
-  }
-  __pyx_t_11 = 0;
-  __pyx_v_visited = ((PyArrayObject *)__pyx_t_5);
-  __pyx_t_5 = 0;
-
-  /* "flake_detection/find_circles.pyx":84
- *         np.ndarray[np.uint8_t, ndim=2, cast=True] img = img_py
- *         np.ndarray[np.int32_t, ndim=2] disks = np.ones_like(img_py, dtype=int) * -1, visited = np.ones_like(img_py, dtype=int) * -1
+ *         np.ndarray[np.int32_t, ndim=2] flood
  *         vector[int] y = y_py, x = x_py, area = [1] * tot_cand, rad = rad_py             # <<<<<<<<<<<<<<
  *         vector[pair[int, int]] dire = [(1, 0), (-1, 0), (0, 1), (0, -1)]
  *         queue[pair[int, int]] que
  */
-  __pyx_t_12 = __pyx_convert_vector_from_py_int(__pyx_v_y_py); if (unlikely(PyErr_Occurred())) __PYX_ERR(0, 84, __pyx_L1_error)
-  __pyx_v_y = __pyx_t_12;
-  __pyx_t_12 = __pyx_convert_vector_from_py_int(__pyx_v_x_py); if (unlikely(PyErr_Occurred())) __PYX_ERR(0, 84, __pyx_L1_error)
-  __pyx_v_x = __pyx_t_12;
-  __pyx_t_5 = PyList_New(1 * ((__pyx_v_tot_cand<0) ? 0:__pyx_v_tot_cand)); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 84, __pyx_L1_error)
-  __Pyx_GOTREF(__pyx_t_5);
+  __pyx_t_7 = __pyx_convert_vector_from_py_int(__pyx_v_y_py); if (unlikely(PyErr_Occurred())) __PYX_ERR(0, 83, __pyx_L1_error)
+  __pyx_v_y = __pyx_t_7;
+  __pyx_t_7 = __pyx_convert_vector_from_py_int(__pyx_v_x_py); if (unlikely(PyErr_Occurred())) __PYX_ERR(0, 83, __pyx_L1_error)
+  __pyx_v_x = __pyx_t_7;
+  __pyx_t_6 = PyList_New(1 * ((__pyx_v_tot_cand<0) ? 0:__pyx_v_tot_cand)); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 83, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_6);
   { Py_ssize_t __pyx_temp;
     for (__pyx_temp=0; __pyx_temp < __pyx_v_tot_cand; __pyx_temp++) {
       __Pyx_INCREF(__pyx_int_1);
       __Pyx_GIVEREF(__pyx_int_1);
-      PyList_SET_ITEM(__pyx_t_5, __pyx_temp, __pyx_int_1);
+      PyList_SET_ITEM(__pyx_t_6, __pyx_temp, __pyx_int_1);
     }
   }
-  __pyx_t_12 = __pyx_convert_vector_from_py_int(__pyx_t_5); if (unlikely(PyErr_Occurred())) __PYX_ERR(0, 84, __pyx_L1_error)
-  __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
-  __pyx_v_area = __pyx_t_12;
-  __pyx_t_12 = __pyx_convert_vector_from_py_int(__pyx_v_rad_py); if (unlikely(PyErr_Occurred())) __PYX_ERR(0, 84, __pyx_L1_error)
-  __pyx_v_rad = __pyx_t_12;
+  __pyx_t_7 = __pyx_convert_vector_from_py_int(__pyx_t_6); if (unlikely(PyErr_Occurred())) __PYX_ERR(0, 83, __pyx_L1_error)
+  __Pyx_DECREF(__pyx_t_6); __pyx_t_6 = 0;
+  __pyx_v_area = __pyx_t_7;
+  __pyx_t_7 = __pyx_convert_vector_from_py_int(__pyx_v_rad_py); if (unlikely(PyErr_Occurred())) __PYX_ERR(0, 83, __pyx_L1_error)
+  __pyx_v_rad = __pyx_t_7;
 
-  /* "flake_detection/find_circles.pyx":85
- *         np.ndarray[np.int32_t, ndim=2] disks = np.ones_like(img_py, dtype=int) * -1, visited = np.ones_like(img_py, dtype=int) * -1
+  /* "flake_detection/find_circles.pyx":84
+ *         np.ndarray[np.int32_t, ndim=2] flood
  *         vector[int] y = y_py, x = x_py, area = [1] * tot_cand, rad = rad_py
  *         vector[pair[int, int]] dire = [(1, 0), (-1, 0), (0, 1), (0, -1)]             # <<<<<<<<<<<<<<
  *         queue[pair[int, int]] que
  *         pair[int, int] t, tt
  */
-  __pyx_t_5 = PyList_New(4); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 85, __pyx_L1_error)
-  __Pyx_GOTREF(__pyx_t_5);
+  __pyx_t_6 = PyList_New(4); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 84, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_6);
   __Pyx_INCREF(__pyx_tuple_);
   __Pyx_GIVEREF(__pyx_tuple_);
-  PyList_SET_ITEM(__pyx_t_5, 0, __pyx_tuple_);
+  PyList_SET_ITEM(__pyx_t_6, 0, __pyx_tuple_);
   __Pyx_INCREF(__pyx_tuple__2);
   __Pyx_GIVEREF(__pyx_tuple__2);
-  PyList_SET_ITEM(__pyx_t_5, 1, __pyx_tuple__2);
+  PyList_SET_ITEM(__pyx_t_6, 1, __pyx_tuple__2);
   __Pyx_INCREF(__pyx_tuple__3);
   __Pyx_GIVEREF(__pyx_tuple__3);
-  PyList_SET_ITEM(__pyx_t_5, 2, __pyx_tuple__3);
+  PyList_SET_ITEM(__pyx_t_6, 2, __pyx_tuple__3);
   __Pyx_INCREF(__pyx_tuple__4);
   __Pyx_GIVEREF(__pyx_tuple__4);
-  PyList_SET_ITEM(__pyx_t_5, 3, __pyx_tuple__4);
-  __pyx_t_13 = __pyx_convert_vector_from_py_std_3a__3a_pair_3c_int_2c_int_3e___(__pyx_t_5); if (unlikely(PyErr_Occurred())) __PYX_ERR(0, 85, __pyx_L1_error)
-  __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
-  __pyx_v_dire = __pyx_t_13;
-
-  /* "flake_detection/find_circles.pyx":90
- * 
- *     # draw filled disks
- *     for i in np.argsort(rad_py):             # <<<<<<<<<<<<<<
- *         cv2.circle(disks, (x[i], y[i]), rad[i], i, -1)
- * 
- */
-  __Pyx_GetModuleGlobalName(__pyx_t_6, __pyx_n_s_np); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 90, __pyx_L1_error)
-  __Pyx_GOTREF(__pyx_t_6);
-  __pyx_t_9 = __Pyx_PyObject_GetAttrStr(__pyx_t_6, __pyx_n_s_argsort); if (unlikely(!__pyx_t_9)) __PYX_ERR(0, 90, __pyx_L1_error)
-  __Pyx_GOTREF(__pyx_t_9);
+  PyList_SET_ITEM(__pyx_t_6, 3, __pyx_tuple__4);
+  __pyx_t_8 = __pyx_convert_vector_from_py_std_3a__3a_pair_3c_int_2c_int_3e___(__pyx_t_6); if (unlikely(PyErr_Occurred())) __PYX_ERR(0, 84, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_6); __pyx_t_6 = 0;
-  __pyx_t_6 = NULL;
-  if (CYTHON_UNPACK_METHODS && unlikely(PyMethod_Check(__pyx_t_9))) {
-    __pyx_t_6 = PyMethod_GET_SELF(__pyx_t_9);
-    if (likely(__pyx_t_6)) {
-      PyObject* function = PyMethod_GET_FUNCTION(__pyx_t_9);
-      __Pyx_INCREF(__pyx_t_6);
-      __Pyx_INCREF(function);
-      __Pyx_DECREF_SET(__pyx_t_9, function);
-    }
-  }
-  __pyx_t_5 = (__pyx_t_6) ? __Pyx_PyObject_Call2Args(__pyx_t_9, __pyx_t_6, __pyx_v_rad_py) : __Pyx_PyObject_CallOneArg(__pyx_t_9, __pyx_v_rad_py);
-  __Pyx_XDECREF(__pyx_t_6); __pyx_t_6 = 0;
-  if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 90, __pyx_L1_error)
-  __Pyx_GOTREF(__pyx_t_5);
-  __Pyx_DECREF(__pyx_t_9); __pyx_t_9 = 0;
-  if (likely(PyList_CheckExact(__pyx_t_5)) || PyTuple_CheckExact(__pyx_t_5)) {
-    __pyx_t_9 = __pyx_t_5; __Pyx_INCREF(__pyx_t_9); __pyx_t_2 = 0;
-    __pyx_t_14 = NULL;
-  } else {
-    __pyx_t_2 = -1; __pyx_t_9 = PyObject_GetIter(__pyx_t_5); if (unlikely(!__pyx_t_9)) __PYX_ERR(0, 90, __pyx_L1_error)
-    __Pyx_GOTREF(__pyx_t_9);
-    __pyx_t_14 = Py_TYPE(__pyx_t_9)->tp_iternext; if (unlikely(!__pyx_t_14)) __PYX_ERR(0, 90, __pyx_L1_error)
-  }
-  __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
-  for (;;) {
-    if (likely(!__pyx_t_14)) {
-      if (likely(PyList_CheckExact(__pyx_t_9))) {
-        if (__pyx_t_2 >= PyList_GET_SIZE(__pyx_t_9)) break;
-        #if CYTHON_ASSUME_SAFE_MACROS && !CYTHON_AVOID_BORROWED_REFS
-        __pyx_t_5 = PyList_GET_ITEM(__pyx_t_9, __pyx_t_2); __Pyx_INCREF(__pyx_t_5); __pyx_t_2++; if (unlikely(0 < 0)) __PYX_ERR(0, 90, __pyx_L1_error)
-        #else
-        __pyx_t_5 = PySequence_ITEM(__pyx_t_9, __pyx_t_2); __pyx_t_2++; if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 90, __pyx_L1_error)
-        __Pyx_GOTREF(__pyx_t_5);
-        #endif
-      } else {
-        if (__pyx_t_2 >= PyTuple_GET_SIZE(__pyx_t_9)) break;
-        #if CYTHON_ASSUME_SAFE_MACROS && !CYTHON_AVOID_BORROWED_REFS
-        __pyx_t_5 = PyTuple_GET_ITEM(__pyx_t_9, __pyx_t_2); __Pyx_INCREF(__pyx_t_5); __pyx_t_2++; if (unlikely(0 < 0)) __PYX_ERR(0, 90, __pyx_L1_error)
-        #else
-        __pyx_t_5 = PySequence_ITEM(__pyx_t_9, __pyx_t_2); __pyx_t_2++; if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 90, __pyx_L1_error)
-        __Pyx_GOTREF(__pyx_t_5);
-        #endif
-      }
+  __pyx_v_dire = __pyx_t_8;
+
+  /* "flake_detection/find_circles.pyx":88
+ *         pair[int, int] t, tt
+ *         int ys, xs, ye, se, height, width
+ *     floods = []             # <<<<<<<<<<<<<<
+ *     for i in range(tot_cand):
+ *         ys = max(0, y[i] - rad[i] * 2)
+ */
+  __pyx_t_6 = PyList_New(0); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 88, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_6);
+  __pyx_v_floods = ((PyObject*)__pyx_t_6);
+  __pyx_t_6 = 0;
+
+  /* "flake_detection/find_circles.pyx":89
+ *         int ys, xs, ye, se, height, width
+ *     floods = []
+ *     for i in range(tot_cand):             # <<<<<<<<<<<<<<
+ *         ys = max(0, y[i] - rad[i] * 2)
+ *         xs = max(0, x[i] - rad[i] * 2)
+ */
+  __pyx_t_9 = __pyx_v_tot_cand;
+  __pyx_t_10 = __pyx_t_9;
+  for (__pyx_t_11 = 0; __pyx_t_11 < __pyx_t_10; __pyx_t_11+=1) {
+    __pyx_v_i = __pyx_t_11;
+
+    /* "flake_detection/find_circles.pyx":90
+ *     floods = []
+ *     for i in range(tot_cand):
+ *         ys = max(0, y[i] - rad[i] * 2)             # <<<<<<<<<<<<<<
+ *         xs = max(0, x[i] - rad[i] * 2)
+ *         ye = min(img.shape[0], y[i] + rad[i] * 2)
+ */
+    __pyx_t_12 = ((__pyx_v_y[__pyx_v_i]) - ((__pyx_v_rad[__pyx_v_i]) * 2));
+    __pyx_t_13 = 0;
+    if (((__pyx_t_12 > __pyx_t_13) != 0)) {
+      __pyx_t_14 = __pyx_t_12;
     } else {
-      __pyx_t_5 = __pyx_t_14(__pyx_t_9);
-      if (unlikely(!__pyx_t_5)) {
-        PyObject* exc_type = PyErr_Occurred();
-        if (exc_type) {
-          if (likely(__Pyx_PyErr_GivenExceptionMatches(exc_type, PyExc_StopIteration))) PyErr_Clear();
-          else __PYX_ERR(0, 90, __pyx_L1_error)
-        }
-        break;
-      }
-      __Pyx_GOTREF(__pyx_t_5);
+      __pyx_t_14 = __pyx_t_13;
     }
-    __pyx_t_7 = __Pyx_PyInt_As_int(__pyx_t_5); if (unlikely((__pyx_t_7 == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 90, __pyx_L1_error)
-    __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
-    __pyx_v_i = __pyx_t_7;
+    __pyx_v_ys = __pyx_t_14;
 
     /* "flake_detection/find_circles.pyx":91
- *     # draw filled disks
- *     for i in np.argsort(rad_py):
- *         cv2.circle(disks, (x[i], y[i]), rad[i], i, -1)             # <<<<<<<<<<<<<<
- * 
  *     for i in range(tot_cand):
+ *         ys = max(0, y[i] - rad[i] * 2)
+ *         xs = max(0, x[i] - rad[i] * 2)             # <<<<<<<<<<<<<<
+ *         ye = min(img.shape[0], y[i] + rad[i] * 2)
+ *         xe = min(img.shape[1], x[i] + rad[i] * 2)
  */
-    __Pyx_GetModuleGlobalName(__pyx_t_6, __pyx_n_s_cv2); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 91, __pyx_L1_error)
+    __pyx_t_14 = ((__pyx_v_x[__pyx_v_i]) - ((__pyx_v_rad[__pyx_v_i]) * 2));
+    __pyx_t_12 = 0;
+    if (((__pyx_t_14 > __pyx_t_12) != 0)) {
+      __pyx_t_13 = __pyx_t_14;
+    } else {
+      __pyx_t_13 = __pyx_t_12;
+    }
+    __pyx_v_xs = __pyx_t_13;
+
+    /* "flake_detection/find_circles.pyx":92
+ *         ys = max(0, y[i] - rad[i] * 2)
+ *         xs = max(0, x[i] - rad[i] * 2)
+ *         ye = min(img.shape[0], y[i] + rad[i] * 2)             # <<<<<<<<<<<<<<
+ *         xe = min(img.shape[1], x[i] + rad[i] * 2)
+ *         height = ye - ys
+ */
+    __pyx_t_13 = ((__pyx_v_y[__pyx_v_i]) + ((__pyx_v_rad[__pyx_v_i]) * 2));
+    __pyx_t_15 = (__pyx_v_img->dimensions[0]);
+    if (((__pyx_t_13 < __pyx_t_15) != 0)) {
+      __pyx_t_14 = __pyx_t_13;
+    } else {
+      __pyx_t_14 = __pyx_t_15;
+    }
+    __pyx_v_ye = __pyx_t_14;
+
+    /* "flake_detection/find_circles.pyx":93
+ *         xs = max(0, x[i] - rad[i] * 2)
+ *         ye = min(img.shape[0], y[i] + rad[i] * 2)
+ *         xe = min(img.shape[1], x[i] + rad[i] * 2)             # <<<<<<<<<<<<<<
+ *         height = ye - ys
+ *         width = xe - xs
+ */
+    __pyx_t_14 = ((__pyx_v_x[__pyx_v_i]) + ((__pyx_v_rad[__pyx_v_i]) * 2));
+    __pyx_t_15 = (__pyx_v_img->dimensions[1]);
+    if (((__pyx_t_14 < __pyx_t_15) != 0)) {
+      __pyx_t_13 = __pyx_t_14;
+    } else {
+      __pyx_t_13 = __pyx_t_15;
+    }
+    __pyx_t_6 = __Pyx_PyInt_From_long(__pyx_t_13); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 93, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_6);
-    __pyx_t_10 = __Pyx_PyObject_GetAttrStr(__pyx_t_6, __pyx_n_s_circle); if (unlikely(!__pyx_t_10)) __PYX_ERR(0, 91, __pyx_L1_error)
-    __Pyx_GOTREF(__pyx_t_10);
-    __Pyx_DECREF(__pyx_t_6); __pyx_t_6 = 0;
-    __pyx_t_6 = __Pyx_PyInt_From_int((__pyx_v_x[__pyx_v_i])); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 91, __pyx_L1_error)
-    __Pyx_GOTREF(__pyx_t_6);
-    __pyx_t_15 = __Pyx_PyInt_From_int((__pyx_v_y[__pyx_v_i])); if (unlikely(!__pyx_t_15)) __PYX_ERR(0, 91, __pyx_L1_error)
-    __Pyx_GOTREF(__pyx_t_15);
-    __pyx_t_16 = PyTuple_New(2); if (unlikely(!__pyx_t_16)) __PYX_ERR(0, 91, __pyx_L1_error)
-    __Pyx_GOTREF(__pyx_t_16);
-    __Pyx_GIVEREF(__pyx_t_6);
-    PyTuple_SET_ITEM(__pyx_t_16, 0, __pyx_t_6);
-    __Pyx_GIVEREF(__pyx_t_15);
-    PyTuple_SET_ITEM(__pyx_t_16, 1, __pyx_t_15);
+    __Pyx_XDECREF_SET(__pyx_v_xe, __pyx_t_6);
     __pyx_t_6 = 0;
-    __pyx_t_15 = 0;
-    __pyx_t_15 = __Pyx_PyInt_From_int((__pyx_v_rad[__pyx_v_i])); if (unlikely(!__pyx_t_15)) __PYX_ERR(0, 91, __pyx_L1_error)
-    __Pyx_GOTREF(__pyx_t_15);
-    __pyx_t_6 = __Pyx_PyInt_From_int(__pyx_v_i); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 91, __pyx_L1_error)
+
+    /* "flake_detection/find_circles.pyx":94
+ *         ye = min(img.shape[0], y[i] + rad[i] * 2)
+ *         xe = min(img.shape[1], x[i] + rad[i] * 2)
+ *         height = ye - ys             # <<<<<<<<<<<<<<
+ *         width = xe - xs
+ *         crop = img[ys:ye, xs:xe]
+ */
+    __pyx_v_height = (__pyx_v_ye - __pyx_v_ys);
+
+    /* "flake_detection/find_circles.pyx":95
+ *         xe = min(img.shape[1], x[i] + rad[i] * 2)
+ *         height = ye - ys
+ *         width = xe - xs             # <<<<<<<<<<<<<<
+ *         crop = img[ys:ye, xs:xe]
+ *         flood = np.zeros_like(crop, dtype=int)
+ */
+    __pyx_t_6 = __Pyx_PyInt_From_int(__pyx_v_xs); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 95, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_6);
-    __pyx_t_17 = NULL;
-    __pyx_t_7 = 0;
-    if (CYTHON_UNPACK_METHODS && unlikely(PyMethod_Check(__pyx_t_10))) {
-      __pyx_t_17 = PyMethod_GET_SELF(__pyx_t_10);
-      if (likely(__pyx_t_17)) {
-        PyObject* function = PyMethod_GET_FUNCTION(__pyx_t_10);
-        __Pyx_INCREF(__pyx_t_17);
+    __pyx_t_16 = PyNumber_Subtract(__pyx_v_xe, __pyx_t_6); if (unlikely(!__pyx_t_16)) __PYX_ERR(0, 95, __pyx_L1_error)
+    __Pyx_GOTREF(__pyx_t_16);
+    __Pyx_DECREF(__pyx_t_6); __pyx_t_6 = 0;
+    __pyx_t_17 = __Pyx_PyInt_As_int(__pyx_t_16); if (unlikely((__pyx_t_17 == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 95, __pyx_L1_error)
+    __Pyx_DECREF(__pyx_t_16); __pyx_t_16 = 0;
+    __pyx_v_width = __pyx_t_17;
+
+    /* "flake_detection/find_circles.pyx":96
+ *         height = ye - ys
+ *         width = xe - xs
+ *         crop = img[ys:ye, xs:xe]             # <<<<<<<<<<<<<<
+ *         flood = np.zeros_like(crop, dtype=int)
+ *         t = y[i] - ys, x[i] - xs
+ */
+    __pyx_t_16 = __Pyx_PyInt_From_int(__pyx_v_ys); if (unlikely(!__pyx_t_16)) __PYX_ERR(0, 96, __pyx_L1_error)
+    __Pyx_GOTREF(__pyx_t_16);
+    __pyx_t_6 = __Pyx_PyInt_From_int(__pyx_v_ye); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 96, __pyx_L1_error)
+    __Pyx_GOTREF(__pyx_t_6);
+    __pyx_t_18 = PySlice_New(__pyx_t_16, __pyx_t_6, Py_None); if (unlikely(!__pyx_t_18)) __PYX_ERR(0, 96, __pyx_L1_error)
+    __Pyx_GOTREF(__pyx_t_18);
+    __Pyx_DECREF(__pyx_t_16); __pyx_t_16 = 0;
+    __Pyx_DECREF(__pyx_t_6); __pyx_t_6 = 0;
+    __pyx_t_6 = __Pyx_PyInt_From_int(__pyx_v_xs); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 96, __pyx_L1_error)
+    __Pyx_GOTREF(__pyx_t_6);
+    __pyx_t_16 = PySlice_New(__pyx_t_6, __pyx_v_xe, Py_None); if (unlikely(!__pyx_t_16)) __PYX_ERR(0, 96, __pyx_L1_error)
+    __Pyx_GOTREF(__pyx_t_16);
+    __Pyx_DECREF(__pyx_t_6); __pyx_t_6 = 0;
+    __pyx_t_6 = PyTuple_New(2); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 96, __pyx_L1_error)
+    __Pyx_GOTREF(__pyx_t_6);
+    __Pyx_GIVEREF(__pyx_t_18);
+    PyTuple_SET_ITEM(__pyx_t_6, 0, __pyx_t_18);
+    __Pyx_GIVEREF(__pyx_t_16);
+    PyTuple_SET_ITEM(__pyx_t_6, 1, __pyx_t_16);
+    __pyx_t_18 = 0;
+    __pyx_t_16 = 0;
+    __pyx_t_16 = __Pyx_PyObject_GetItem(((PyObject *)__pyx_v_img), __pyx_t_6); if (unlikely(!__pyx_t_16)) __PYX_ERR(0, 96, __pyx_L1_error)
+    __Pyx_GOTREF(__pyx_t_16);
+    __Pyx_DECREF(__pyx_t_6); __pyx_t_6 = 0;
+    __Pyx_XDECREF_SET(__pyx_v_crop, __pyx_t_16);
+    __pyx_t_16 = 0;
+
+    /* "flake_detection/find_circles.pyx":97
+ *         width = xe - xs
+ *         crop = img[ys:ye, xs:xe]
+ *         flood = np.zeros_like(crop, dtype=int)             # <<<<<<<<<<<<<<
+ *         t = y[i] - ys, x[i] - xs
+ *         cv2.circle(flood, (x[i] - xs, y[i] - ys), int(rad[i]), 1, -1)
+ */
+    __Pyx_GetModuleGlobalName(__pyx_t_16, __pyx_n_s_np); if (unlikely(!__pyx_t_16)) __PYX_ERR(0, 97, __pyx_L1_error)
+    __Pyx_GOTREF(__pyx_t_16);
+    __pyx_t_6 = __Pyx_PyObject_GetAttrStr(__pyx_t_16, __pyx_n_s_zeros_like); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 97, __pyx_L1_error)
+    __Pyx_GOTREF(__pyx_t_6);
+    __Pyx_DECREF(__pyx_t_16); __pyx_t_16 = 0;
+    __pyx_t_16 = PyTuple_New(1); if (unlikely(!__pyx_t_16)) __PYX_ERR(0, 97, __pyx_L1_error)
+    __Pyx_GOTREF(__pyx_t_16);
+    __Pyx_INCREF(__pyx_v_crop);
+    __Pyx_GIVEREF(__pyx_v_crop);
+    PyTuple_SET_ITEM(__pyx_t_16, 0, __pyx_v_crop);
+    __pyx_t_18 = __Pyx_PyDict_NewPresized(1); if (unlikely(!__pyx_t_18)) __PYX_ERR(0, 97, __pyx_L1_error)
+    __Pyx_GOTREF(__pyx_t_18);
+    if (PyDict_SetItem(__pyx_t_18, __pyx_n_s_dtype, ((PyObject *)(&PyInt_Type))) < 0) __PYX_ERR(0, 97, __pyx_L1_error)
+    __pyx_t_19 = __Pyx_PyObject_Call(__pyx_t_6, __pyx_t_16, __pyx_t_18); if (unlikely(!__pyx_t_19)) __PYX_ERR(0, 97, __pyx_L1_error)
+    __Pyx_GOTREF(__pyx_t_19);
+    __Pyx_DECREF(__pyx_t_6); __pyx_t_6 = 0;
+    __Pyx_DECREF(__pyx_t_16); __pyx_t_16 = 0;
+    __Pyx_DECREF(__pyx_t_18); __pyx_t_18 = 0;
+    if (!(likely(((__pyx_t_19) == Py_None) || likely(__Pyx_TypeTest(__pyx_t_19, __pyx_ptype_5numpy_ndarray))))) __PYX_ERR(0, 97, __pyx_L1_error)
+    __pyx_t_20 = ((PyArrayObject *)__pyx_t_19);
+    {
+      __Pyx_BufFmt_StackElem __pyx_stack[1];
+      __Pyx_SafeReleaseBuffer(&__pyx_pybuffernd_flood.rcbuffer->pybuffer);
+      __pyx_t_17 = __Pyx_GetBufferAndValidate(&__pyx_pybuffernd_flood.rcbuffer->pybuffer, (PyObject*)__pyx_t_20, &__Pyx_TypeInfo_nn___pyx_t_5numpy_int32_t, PyBUF_FORMAT| PyBUF_STRIDES| PyBUF_WRITABLE, 2, 0, __pyx_stack);
+      if (unlikely(__pyx_t_17 < 0)) {
+        PyErr_Fetch(&__pyx_t_21, &__pyx_t_22, &__pyx_t_23);
+        if (unlikely(__Pyx_GetBufferAndValidate(&__pyx_pybuffernd_flood.rcbuffer->pybuffer, (PyObject*)__pyx_v_flood, &__Pyx_TypeInfo_nn___pyx_t_5numpy_int32_t, PyBUF_FORMAT| PyBUF_STRIDES| PyBUF_WRITABLE, 2, 0, __pyx_stack) == -1)) {
+          Py_XDECREF(__pyx_t_21); Py_XDECREF(__pyx_t_22); Py_XDECREF(__pyx_t_23);
+          __Pyx_RaiseBufferFallbackError();
+        } else {
+          PyErr_Restore(__pyx_t_21, __pyx_t_22, __pyx_t_23);
+        }
+        __pyx_t_21 = __pyx_t_22 = __pyx_t_23 = 0;
+      }
+      __pyx_pybuffernd_flood.diminfo[0].strides = __pyx_pybuffernd_flood.rcbuffer->pybuffer.strides[0]; __pyx_pybuffernd_flood.diminfo[0].shape = __pyx_pybuffernd_flood.rcbuffer->pybuffer.shape[0]; __pyx_pybuffernd_flood.diminfo[1].strides = __pyx_pybuffernd_flood.rcbuffer->pybuffer.strides[1]; __pyx_pybuffernd_flood.diminfo[1].shape = __pyx_pybuffernd_flood.rcbuffer->pybuffer.shape[1];
+      if (unlikely(__pyx_t_17 < 0)) __PYX_ERR(0, 97, __pyx_L1_error)
+    }
+    __pyx_t_20 = 0;
+    __Pyx_XDECREF_SET(__pyx_v_flood, ((PyArrayObject *)__pyx_t_19));
+    __pyx_t_19 = 0;
+
+    /* "flake_detection/find_circles.pyx":98
+ *         crop = img[ys:ye, xs:xe]
+ *         flood = np.zeros_like(crop, dtype=int)
+ *         t = y[i] - ys, x[i] - xs             # <<<<<<<<<<<<<<
+ *         cv2.circle(flood, (x[i] - xs, y[i] - ys), int(rad[i]), 1, -1)
+ *         que.push(t)
+ */
+    __pyx_t_19 = __Pyx_PyInt_From_int(((__pyx_v_y[__pyx_v_i]) - __pyx_v_ys)); if (unlikely(!__pyx_t_19)) __PYX_ERR(0, 98, __pyx_L1_error)
+    __Pyx_GOTREF(__pyx_t_19);
+    __pyx_t_18 = __Pyx_PyInt_From_int(((__pyx_v_x[__pyx_v_i]) - __pyx_v_xs)); if (unlikely(!__pyx_t_18)) __PYX_ERR(0, 98, __pyx_L1_error)
+    __Pyx_GOTREF(__pyx_t_18);
+    __pyx_t_16 = PyTuple_New(2); if (unlikely(!__pyx_t_16)) __PYX_ERR(0, 98, __pyx_L1_error)
+    __Pyx_GOTREF(__pyx_t_16);
+    __Pyx_GIVEREF(__pyx_t_19);
+    PyTuple_SET_ITEM(__pyx_t_16, 0, __pyx_t_19);
+    __Pyx_GIVEREF(__pyx_t_18);
+    PyTuple_SET_ITEM(__pyx_t_16, 1, __pyx_t_18);
+    __pyx_t_19 = 0;
+    __pyx_t_18 = 0;
+    __pyx_t_24 = __pyx_convert_pair_from_py_int__and_int(__pyx_t_16); if (unlikely(PyErr_Occurred())) __PYX_ERR(0, 98, __pyx_L1_error)
+    __Pyx_DECREF(__pyx_t_16); __pyx_t_16 = 0;
+    __pyx_v_t = __pyx_t_24;
+
+    /* "flake_detection/find_circles.pyx":99
+ *         flood = np.zeros_like(crop, dtype=int)
+ *         t = y[i] - ys, x[i] - xs
+ *         cv2.circle(flood, (x[i] - xs, y[i] - ys), int(rad[i]), 1, -1)             # <<<<<<<<<<<<<<
+ *         que.push(t)
+ *         thr = crop[t.first, t.second] * cr
+ */
+    __Pyx_GetModuleGlobalName(__pyx_t_18, __pyx_n_s_cv2); if (unlikely(!__pyx_t_18)) __PYX_ERR(0, 99, __pyx_L1_error)
+    __Pyx_GOTREF(__pyx_t_18);
+    __pyx_t_19 = __Pyx_PyObject_GetAttrStr(__pyx_t_18, __pyx_n_s_circle); if (unlikely(!__pyx_t_19)) __PYX_ERR(0, 99, __pyx_L1_error)
+    __Pyx_GOTREF(__pyx_t_19);
+    __Pyx_DECREF(__pyx_t_18); __pyx_t_18 = 0;
+    __pyx_t_18 = __Pyx_PyInt_From_int(((__pyx_v_x[__pyx_v_i]) - __pyx_v_xs)); if (unlikely(!__pyx_t_18)) __PYX_ERR(0, 99, __pyx_L1_error)
+    __Pyx_GOTREF(__pyx_t_18);
+    __pyx_t_6 = __Pyx_PyInt_From_int(((__pyx_v_y[__pyx_v_i]) - __pyx_v_ys)); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 99, __pyx_L1_error)
+    __Pyx_GOTREF(__pyx_t_6);
+    __pyx_t_25 = PyTuple_New(2); if (unlikely(!__pyx_t_25)) __PYX_ERR(0, 99, __pyx_L1_error)
+    __Pyx_GOTREF(__pyx_t_25);
+    __Pyx_GIVEREF(__pyx_t_18);
+    PyTuple_SET_ITEM(__pyx_t_25, 0, __pyx_t_18);
+    __Pyx_GIVEREF(__pyx_t_6);
+    PyTuple_SET_ITEM(__pyx_t_25, 1, __pyx_t_6);
+    __pyx_t_18 = 0;
+    __pyx_t_6 = 0;
+    __pyx_t_6 = __Pyx_PyInt_From_int((__pyx_v_rad[__pyx_v_i])); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 99, __pyx_L1_error)
+    __Pyx_GOTREF(__pyx_t_6);
+    __pyx_t_18 = __Pyx_PyObject_CallOneArg(((PyObject *)(&PyInt_Type)), __pyx_t_6); if (unlikely(!__pyx_t_18)) __PYX_ERR(0, 99, __pyx_L1_error)
+    __Pyx_GOTREF(__pyx_t_18);
+    __Pyx_DECREF(__pyx_t_6); __pyx_t_6 = 0;
+    __pyx_t_6 = NULL;
+    __pyx_t_17 = 0;
+    if (CYTHON_UNPACK_METHODS && unlikely(PyMethod_Check(__pyx_t_19))) {
+      __pyx_t_6 = PyMethod_GET_SELF(__pyx_t_19);
+      if (likely(__pyx_t_6)) {
+        PyObject* function = PyMethod_GET_FUNCTION(__pyx_t_19);
+        __Pyx_INCREF(__pyx_t_6);
         __Pyx_INCREF(function);
-        __Pyx_DECREF_SET(__pyx_t_10, function);
-        __pyx_t_7 = 1;
+        __Pyx_DECREF_SET(__pyx_t_19, function);
+        __pyx_t_17 = 1;
       }
     }
     #if CYTHON_FAST_PYCALL
-    if (PyFunction_Check(__pyx_t_10)) {
-      PyObject *__pyx_temp[6] = {__pyx_t_17, ((PyObject *)__pyx_v_disks), __pyx_t_16, __pyx_t_15, __pyx_t_6, __pyx_int_neg_1};
-      __pyx_t_5 = __Pyx_PyFunction_FastCall(__pyx_t_10, __pyx_temp+1-__pyx_t_7, 5+__pyx_t_7); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 91, __pyx_L1_error)
-      __Pyx_XDECREF(__pyx_t_17); __pyx_t_17 = 0;
-      __Pyx_GOTREF(__pyx_t_5);
-      __Pyx_DECREF(__pyx_t_16); __pyx_t_16 = 0;
-      __Pyx_DECREF(__pyx_t_15); __pyx_t_15 = 0;
-      __Pyx_DECREF(__pyx_t_6); __pyx_t_6 = 0;
+    if (PyFunction_Check(__pyx_t_19)) {
+      PyObject *__pyx_temp[6] = {__pyx_t_6, ((PyObject *)__pyx_v_flood), __pyx_t_25, __pyx_t_18, __pyx_int_1, __pyx_int_neg_1};
+      __pyx_t_16 = __Pyx_PyFunction_FastCall(__pyx_t_19, __pyx_temp+1-__pyx_t_17, 5+__pyx_t_17); if (unlikely(!__pyx_t_16)) __PYX_ERR(0, 99, __pyx_L1_error)
+      __Pyx_XDECREF(__pyx_t_6); __pyx_t_6 = 0;
+      __Pyx_GOTREF(__pyx_t_16);
+      __Pyx_DECREF(__pyx_t_25); __pyx_t_25 = 0;
+      __Pyx_DECREF(__pyx_t_18); __pyx_t_18 = 0;
     } else
     #endif
     #if CYTHON_FAST_PYCCALL
-    if (__Pyx_PyFastCFunction_Check(__pyx_t_10)) {
-      PyObject *__pyx_temp[6] = {__pyx_t_17, ((PyObject *)__pyx_v_disks), __pyx_t_16, __pyx_t_15, __pyx_t_6, __pyx_int_neg_1};
-      __pyx_t_5 = __Pyx_PyCFunction_FastCall(__pyx_t_10, __pyx_temp+1-__pyx_t_7, 5+__pyx_t_7); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 91, __pyx_L1_error)
-      __Pyx_XDECREF(__pyx_t_17); __pyx_t_17 = 0;
-      __Pyx_GOTREF(__pyx_t_5);
-      __Pyx_DECREF(__pyx_t_16); __pyx_t_16 = 0;
-      __Pyx_DECREF(__pyx_t_15); __pyx_t_15 = 0;
-      __Pyx_DECREF(__pyx_t_6); __pyx_t_6 = 0;
+    if (__Pyx_PyFastCFunction_Check(__pyx_t_19)) {
+      PyObject *__pyx_temp[6] = {__pyx_t_6, ((PyObject *)__pyx_v_flood), __pyx_t_25, __pyx_t_18, __pyx_int_1, __pyx_int_neg_1};
+      __pyx_t_16 = __Pyx_PyCFunction_FastCall(__pyx_t_19, __pyx_temp+1-__pyx_t_17, 5+__pyx_t_17); if (unlikely(!__pyx_t_16)) __PYX_ERR(0, 99, __pyx_L1_error)
+      __Pyx_XDECREF(__pyx_t_6); __pyx_t_6 = 0;
+      __Pyx_GOTREF(__pyx_t_16);
+      __Pyx_DECREF(__pyx_t_25); __pyx_t_25 = 0;
+      __Pyx_DECREF(__pyx_t_18); __pyx_t_18 = 0;
     } else
     #endif
     {
-      __pyx_t_18 = PyTuple_New(5+__pyx_t_7); if (unlikely(!__pyx_t_18)) __PYX_ERR(0, 91, __pyx_L1_error)
-      __Pyx_GOTREF(__pyx_t_18);
-      if (__pyx_t_17) {
-        __Pyx_GIVEREF(__pyx_t_17); PyTuple_SET_ITEM(__pyx_t_18, 0, __pyx_t_17); __pyx_t_17 = NULL;
+      __pyx_t_26 = PyTuple_New(5+__pyx_t_17); if (unlikely(!__pyx_t_26)) __PYX_ERR(0, 99, __pyx_L1_error)
+      __Pyx_GOTREF(__pyx_t_26);
+      if (__pyx_t_6) {
+        __Pyx_GIVEREF(__pyx_t_6); PyTuple_SET_ITEM(__pyx_t_26, 0, __pyx_t_6); __pyx_t_6 = NULL;
       }
-      __Pyx_INCREF(((PyObject *)__pyx_v_disks));
-      __Pyx_GIVEREF(((PyObject *)__pyx_v_disks));
-      PyTuple_SET_ITEM(__pyx_t_18, 0+__pyx_t_7, ((PyObject *)__pyx_v_disks));
-      __Pyx_GIVEREF(__pyx_t_16);
-      PyTuple_SET_ITEM(__pyx_t_18, 1+__pyx_t_7, __pyx_t_16);
-      __Pyx_GIVEREF(__pyx_t_15);
-      PyTuple_SET_ITEM(__pyx_t_18, 2+__pyx_t_7, __pyx_t_15);
-      __Pyx_GIVEREF(__pyx_t_6);
-      PyTuple_SET_ITEM(__pyx_t_18, 3+__pyx_t_7, __pyx_t_6);
+      __Pyx_INCREF(((PyObject *)__pyx_v_flood));
+      __Pyx_GIVEREF(((PyObject *)__pyx_v_flood));
+      PyTuple_SET_ITEM(__pyx_t_26, 0+__pyx_t_17, ((PyObject *)__pyx_v_flood));
+      __Pyx_GIVEREF(__pyx_t_25);
+      PyTuple_SET_ITEM(__pyx_t_26, 1+__pyx_t_17, __pyx_t_25);
+      __Pyx_GIVEREF(__pyx_t_18);
+      PyTuple_SET_ITEM(__pyx_t_26, 2+__pyx_t_17, __pyx_t_18);
+      __Pyx_INCREF(__pyx_int_1);
+      __Pyx_GIVEREF(__pyx_int_1);
+      PyTuple_SET_ITEM(__pyx_t_26, 3+__pyx_t_17, __pyx_int_1);
       __Pyx_INCREF(__pyx_int_neg_1);
       __Pyx_GIVEREF(__pyx_int_neg_1);
-      PyTuple_SET_ITEM(__pyx_t_18, 4+__pyx_t_7, __pyx_int_neg_1);
-      __pyx_t_16 = 0;
-      __pyx_t_15 = 0;
-      __pyx_t_6 = 0;
-      __pyx_t_5 = __Pyx_PyObject_Call(__pyx_t_10, __pyx_t_18, NULL); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 91, __pyx_L1_error)
-      __Pyx_GOTREF(__pyx_t_5);
-      __Pyx_DECREF(__pyx_t_18); __pyx_t_18 = 0;
+      PyTuple_SET_ITEM(__pyx_t_26, 4+__pyx_t_17, __pyx_int_neg_1);
+      __pyx_t_25 = 0;
+      __pyx_t_18 = 0;
+      __pyx_t_16 = __Pyx_PyObject_Call(__pyx_t_19, __pyx_t_26, NULL); if (unlikely(!__pyx_t_16)) __PYX_ERR(0, 99, __pyx_L1_error)
+      __Pyx_GOTREF(__pyx_t_16);
+      __Pyx_DECREF(__pyx_t_26); __pyx_t_26 = 0;
     }
-    __Pyx_DECREF(__pyx_t_10); __pyx_t_10 = 0;
-    __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
+    __Pyx_DECREF(__pyx_t_19); __pyx_t_19 = 0;
+    __Pyx_DECREF(__pyx_t_16); __pyx_t_16 = 0;
 
-    /* "flake_detection/find_circles.pyx":90
- * 
- *     # draw filled disks
- *     for i in np.argsort(rad_py):             # <<<<<<<<<<<<<<
- *         cv2.circle(disks, (x[i], y[i]), rad[i], i, -1)
- * 
- */
-  }
-  __Pyx_DECREF(__pyx_t_9); __pyx_t_9 = 0;
-
-  /* "flake_detection/find_circles.pyx":93
- *         cv2.circle(disks, (x[i], y[i]), rad[i], i, -1)
- * 
- *     for i in range(tot_cand):             # <<<<<<<<<<<<<<
- *         t = y[i], x[i]
- *         que.push(t)
- */
-  __pyx_t_7 = __pyx_v_tot_cand;
-  __pyx_t_19 = __pyx_t_7;
-  for (__pyx_t_20 = 0; __pyx_t_20 < __pyx_t_19; __pyx_t_20+=1) {
-    __pyx_v_i = __pyx_t_20;
-
-    /* "flake_detection/find_circles.pyx":94
- * 
- *     for i in range(tot_cand):
- *         t = y[i], x[i]             # <<<<<<<<<<<<<<
- *         que.push(t)
- *         thr = img[t.first, t.second] * cr
- */
-    __pyx_t_9 = __Pyx_PyInt_From_int((__pyx_v_y[__pyx_v_i])); if (unlikely(!__pyx_t_9)) __PYX_ERR(0, 94, __pyx_L1_error)
-    __Pyx_GOTREF(__pyx_t_9);
-    __pyx_t_5 = __Pyx_PyInt_From_int((__pyx_v_x[__pyx_v_i])); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 94, __pyx_L1_error)
-    __Pyx_GOTREF(__pyx_t_5);
-    __pyx_t_10 = PyTuple_New(2); if (unlikely(!__pyx_t_10)) __PYX_ERR(0, 94, __pyx_L1_error)
-    __Pyx_GOTREF(__pyx_t_10);
-    __Pyx_GIVEREF(__pyx_t_9);
-    PyTuple_SET_ITEM(__pyx_t_10, 0, __pyx_t_9);
-    __Pyx_GIVEREF(__pyx_t_5);
-    PyTuple_SET_ITEM(__pyx_t_10, 1, __pyx_t_5);
-    __pyx_t_9 = 0;
-    __pyx_t_5 = 0;
-    __pyx_t_21 = __pyx_convert_pair_from_py_int__and_int(__pyx_t_10); if (unlikely(PyErr_Occurred())) __PYX_ERR(0, 94, __pyx_L1_error)
-    __Pyx_DECREF(__pyx_t_10); __pyx_t_10 = 0;
-    __pyx_v_t = __pyx_t_21;
-
-    /* "flake_detection/find_circles.pyx":95
- *     for i in range(tot_cand):
- *         t = y[i], x[i]
+    /* "flake_detection/find_circles.pyx":100
+ *         t = y[i] - ys, x[i] - xs
+ *         cv2.circle(flood, (x[i] - xs, y[i] - ys), int(rad[i]), 1, -1)
  *         que.push(t)             # <<<<<<<<<<<<<<
- *         thr = img[t.first, t.second] * cr
+ *         thr = crop[t.first, t.second] * cr
  *         if lc > thr:
  */
     __pyx_v_que.push(__pyx_v_t);
 
-    /* "flake_detection/find_circles.pyx":96
- *         t = y[i], x[i]
+    /* "flake_detection/find_circles.pyx":101
+ *         cv2.circle(flood, (x[i] - xs, y[i] - ys), int(rad[i]), 1, -1)
  *         que.push(t)
- *         thr = img[t.first, t.second] * cr             # <<<<<<<<<<<<<<
+ *         thr = crop[t.first, t.second] * cr             # <<<<<<<<<<<<<<
  *         if lc > thr:
  *             thr = lc
  */
-    __pyx_t_22 = __pyx_v_t.first;
-    __pyx_t_23 = __pyx_v_t.second;
-    __pyx_v_thr = ((*__Pyx_BufPtrStrided2d(__pyx_t_5numpy_uint8_t *, __pyx_pybuffernd_img.rcbuffer->pybuffer.buf, __pyx_t_22, __pyx_pybuffernd_img.diminfo[0].strides, __pyx_t_23, __pyx_pybuffernd_img.diminfo[1].strides)) * __pyx_v_cr);
+    __pyx_t_16 = __Pyx_PyInt_From_int(__pyx_v_t.first); if (unlikely(!__pyx_t_16)) __PYX_ERR(0, 101, __pyx_L1_error)
+    __Pyx_GOTREF(__pyx_t_16);
+    __pyx_t_19 = __Pyx_PyInt_From_int(__pyx_v_t.second); if (unlikely(!__pyx_t_19)) __PYX_ERR(0, 101, __pyx_L1_error)
+    __Pyx_GOTREF(__pyx_t_19);
+    __pyx_t_26 = PyTuple_New(2); if (unlikely(!__pyx_t_26)) __PYX_ERR(0, 101, __pyx_L1_error)
+    __Pyx_GOTREF(__pyx_t_26);
+    __Pyx_GIVEREF(__pyx_t_16);
+    PyTuple_SET_ITEM(__pyx_t_26, 0, __pyx_t_16);
+    __Pyx_GIVEREF(__pyx_t_19);
+    PyTuple_SET_ITEM(__pyx_t_26, 1, __pyx_t_19);
+    __pyx_t_16 = 0;
+    __pyx_t_19 = 0;
+    __pyx_t_19 = __Pyx_PyObject_GetItem(__pyx_v_crop, __pyx_t_26); if (unlikely(!__pyx_t_19)) __PYX_ERR(0, 101, __pyx_L1_error)
+    __Pyx_GOTREF(__pyx_t_19);
+    __Pyx_DECREF(__pyx_t_26); __pyx_t_26 = 0;
+    __pyx_t_26 = PyFloat_FromDouble(__pyx_v_cr); if (unlikely(!__pyx_t_26)) __PYX_ERR(0, 101, __pyx_L1_error)
+    __Pyx_GOTREF(__pyx_t_26);
+    __pyx_t_16 = PyNumber_Multiply(__pyx_t_19, __pyx_t_26); if (unlikely(!__pyx_t_16)) __PYX_ERR(0, 101, __pyx_L1_error)
+    __Pyx_GOTREF(__pyx_t_16);
+    __Pyx_DECREF(__pyx_t_19); __pyx_t_19 = 0;
+    __Pyx_DECREF(__pyx_t_26); __pyx_t_26 = 0;
+    __pyx_t_5 = __pyx_PyFloat_AsFloat(__pyx_t_16); if (unlikely((__pyx_t_5 == (float)-1) && PyErr_Occurred())) __PYX_ERR(0, 101, __pyx_L1_error)
+    __Pyx_DECREF(__pyx_t_16); __pyx_t_16 = 0;
+    __pyx_v_thr = __pyx_t_5;
 
-    /* "flake_detection/find_circles.pyx":97
+    /* "flake_detection/find_circles.pyx":102
  *         que.push(t)
- *         thr = img[t.first, t.second] * cr
+ *         thr = crop[t.first, t.second] * cr
  *         if lc > thr:             # <<<<<<<<<<<<<<
  *             thr = lc
- *         visited[t.first, t.second] = i
+ *         while not que.empty():
  */
     __pyx_t_3 = ((__pyx_v_lc > __pyx_v_thr) != 0);
     if (__pyx_t_3) {
 
-      /* "flake_detection/find_circles.pyx":98
- *         thr = img[t.first, t.second] * cr
+      /* "flake_detection/find_circles.pyx":103
+ *         thr = crop[t.first, t.second] * cr
  *         if lc > thr:
  *             thr = lc             # <<<<<<<<<<<<<<
- *         visited[t.first, t.second] = i
- *         while not que.empty():
- */
-      __pyx_v_thr = __pyx_v_lc;
-
-      /* "flake_detection/find_circles.pyx":97
- *         que.push(t)
- *         thr = img[t.first, t.second] * cr
- *         if lc > thr:             # <<<<<<<<<<<<<<
- *             thr = lc
- *         visited[t.first, t.second] = i
- */
-    }
-
-    /* "flake_detection/find_circles.pyx":99
- *         if lc > thr:
- *             thr = lc
- *         visited[t.first, t.second] = i             # <<<<<<<<<<<<<<
  *         while not que.empty():
  *             t = que.front()
  */
-    __pyx_t_23 = __pyx_v_t.first;
-    __pyx_t_22 = __pyx_v_t.second;
-    *__Pyx_BufPtrStrided2d(__pyx_t_5numpy_int32_t *, __pyx_pybuffernd_visited.rcbuffer->pybuffer.buf, __pyx_t_23, __pyx_pybuffernd_visited.diminfo[0].strides, __pyx_t_22, __pyx_pybuffernd_visited.diminfo[1].strides) = __pyx_v_i;
+      __pyx_v_thr = __pyx_v_lc;
 
-    /* "flake_detection/find_circles.pyx":100
+      /* "flake_detection/find_circles.pyx":102
+ *         que.push(t)
+ *         thr = crop[t.first, t.second] * cr
+ *         if lc > thr:             # <<<<<<<<<<<<<<
  *             thr = lc
- *         visited[t.first, t.second] = i
+ *         while not que.empty():
+ */
+    }
+
+    /* "flake_detection/find_circles.pyx":104
+ *         if lc > thr:
+ *             thr = lc
  *         while not que.empty():             # <<<<<<<<<<<<<<
  *             t = que.front()
  *             for d in dire:
@@ -3513,8 +3568,8 @@ static PyObject *__pyx_pf_15flake_detection_12find_circles_2area_estimate(CYTHON
       __pyx_t_3 = ((!(__pyx_v_que.empty() != 0)) != 0);
       if (!__pyx_t_3) break;
 
-      /* "flake_detection/find_circles.pyx":101
- *         visited[t.first, t.second] = i
+      /* "flake_detection/find_circles.pyx":105
+ *             thr = lc
  *         while not que.empty():
  *             t = que.front()             # <<<<<<<<<<<<<<
  *             for d in dire:
@@ -3522,165 +3577,160 @@ static PyObject *__pyx_pf_15flake_detection_12find_circles_2area_estimate(CYTHON
  */
       __pyx_v_t = __pyx_v_que.front();
 
-      /* "flake_detection/find_circles.pyx":102
+      /* "flake_detection/find_circles.pyx":106
  *         while not que.empty():
  *             t = que.front()
  *             for d in dire:             # <<<<<<<<<<<<<<
  *                 tt = t.first + d.first, t.second + d.second
  *                 if height > tt.first >= 0 and width > tt.second >= 0 and \
  */
-      __pyx_t_24 = __pyx_v_dire.begin();
+      __pyx_t_27 = __pyx_v_dire.begin();
       for (;;) {
-        if (!(__pyx_t_24 != __pyx_v_dire.end())) break;
-        __pyx_t_21 = *__pyx_t_24;
-        ++__pyx_t_24;
-        __pyx_v_d = __pyx_t_21;
+        if (!(__pyx_t_27 != __pyx_v_dire.end())) break;
+        __pyx_t_24 = *__pyx_t_27;
+        ++__pyx_t_27;
+        __pyx_v_d = __pyx_t_24;
 
-        /* "flake_detection/find_circles.pyx":103
+        /* "flake_detection/find_circles.pyx":107
  *             t = que.front()
  *             for d in dire:
  *                 tt = t.first + d.first, t.second + d.second             # <<<<<<<<<<<<<<
  *                 if height > tt.first >= 0 and width > tt.second >= 0 and \
- *                         visited[tt.first, tt.second] == -1 and img[tt.first, tt.second] >= thr and \
+ *                         crop[tt.first, tt.second] >= thr and flood[tt.first, tt.second] == 1:
  */
-        __pyx_t_10 = __Pyx_PyInt_From_int((__pyx_v_t.first + __pyx_v_d.first)); if (unlikely(!__pyx_t_10)) __PYX_ERR(0, 103, __pyx_L1_error)
-        __Pyx_GOTREF(__pyx_t_10);
-        __pyx_t_5 = __Pyx_PyInt_From_int((__pyx_v_t.second + __pyx_v_d.second)); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 103, __pyx_L1_error)
-        __Pyx_GOTREF(__pyx_t_5);
-        __pyx_t_9 = PyTuple_New(2); if (unlikely(!__pyx_t_9)) __PYX_ERR(0, 103, __pyx_L1_error)
-        __Pyx_GOTREF(__pyx_t_9);
-        __Pyx_GIVEREF(__pyx_t_10);
-        PyTuple_SET_ITEM(__pyx_t_9, 0, __pyx_t_10);
-        __Pyx_GIVEREF(__pyx_t_5);
-        PyTuple_SET_ITEM(__pyx_t_9, 1, __pyx_t_5);
-        __pyx_t_10 = 0;
-        __pyx_t_5 = 0;
-        __pyx_t_21 = __pyx_convert_pair_from_py_int__and_int(__pyx_t_9); if (unlikely(PyErr_Occurred())) __PYX_ERR(0, 103, __pyx_L1_error)
-        __Pyx_DECREF(__pyx_t_9); __pyx_t_9 = 0;
-        __pyx_v_tt = __pyx_t_21;
+        __pyx_t_16 = __Pyx_PyInt_From_int((__pyx_v_t.first + __pyx_v_d.first)); if (unlikely(!__pyx_t_16)) __PYX_ERR(0, 107, __pyx_L1_error)
+        __Pyx_GOTREF(__pyx_t_16);
+        __pyx_t_26 = __Pyx_PyInt_From_int((__pyx_v_t.second + __pyx_v_d.second)); if (unlikely(!__pyx_t_26)) __PYX_ERR(0, 107, __pyx_L1_error)
+        __Pyx_GOTREF(__pyx_t_26);
+        __pyx_t_19 = PyTuple_New(2); if (unlikely(!__pyx_t_19)) __PYX_ERR(0, 107, __pyx_L1_error)
+        __Pyx_GOTREF(__pyx_t_19);
+        __Pyx_GIVEREF(__pyx_t_16);
+        PyTuple_SET_ITEM(__pyx_t_19, 0, __pyx_t_16);
+        __Pyx_GIVEREF(__pyx_t_26);
+        PyTuple_SET_ITEM(__pyx_t_19, 1, __pyx_t_26);
+        __pyx_t_16 = 0;
+        __pyx_t_26 = 0;
+        __pyx_t_24 = __pyx_convert_pair_from_py_int__and_int(__pyx_t_19); if (unlikely(PyErr_Occurred())) __PYX_ERR(0, 107, __pyx_L1_error)
+        __Pyx_DECREF(__pyx_t_19); __pyx_t_19 = 0;
+        __pyx_v_tt = __pyx_t_24;
 
-        /* "flake_detection/find_circles.pyx":104
+        /* "flake_detection/find_circles.pyx":108
  *             for d in dire:
  *                 tt = t.first + d.first, t.second + d.second
  *                 if height > tt.first >= 0 and width > tt.second >= 0 and \             # <<<<<<<<<<<<<<
- *                         visited[tt.first, tt.second] == -1 and img[tt.first, tt.second] >= thr and \
- *                         (disks[tt.first, tt.second] == i or disks[tt.first, tt.second] == -1):
- */
-        __pyx_t_25 = (__pyx_v_height > __pyx_v_tt.first);
-        if (__pyx_t_25) {
-          __pyx_t_25 = (__pyx_v_tt.first >= 0);
-        }
-        __pyx_t_26 = (__pyx_t_25 != 0);
-        if (__pyx_t_26) {
-        } else {
-          __pyx_t_3 = __pyx_t_26;
-          goto __pyx_L13_bool_binop_done;
-        }
-        __pyx_t_26 = (__pyx_v_width > __pyx_v_tt.second);
-        if (__pyx_t_26) {
-          __pyx_t_26 = (__pyx_v_tt.second >= 0);
-        }
-        __pyx_t_25 = (__pyx_t_26 != 0);
-        if (__pyx_t_25) {
-        } else {
-          __pyx_t_3 = __pyx_t_25;
-          goto __pyx_L13_bool_binop_done;
-        }
-
-        /* "flake_detection/find_circles.pyx":105
- *                 tt = t.first + d.first, t.second + d.second
- *                 if height > tt.first >= 0 and width > tt.second >= 0 and \
- *                         visited[tt.first, tt.second] == -1 and img[tt.first, tt.second] >= thr and \             # <<<<<<<<<<<<<<
- *                         (disks[tt.first, tt.second] == i or disks[tt.first, tt.second] == -1):
+ *                         crop[tt.first, tt.second] >= thr and flood[tt.first, tt.second] == 1:
  *                     que.push(tt)
  */
-        __pyx_t_22 = __pyx_v_tt.first;
-        __pyx_t_23 = __pyx_v_tt.second;
-        __pyx_t_25 = (((*__Pyx_BufPtrStrided2d(__pyx_t_5numpy_int32_t *, __pyx_pybuffernd_visited.rcbuffer->pybuffer.buf, __pyx_t_22, __pyx_pybuffernd_visited.diminfo[0].strides, __pyx_t_23, __pyx_pybuffernd_visited.diminfo[1].strides)) == -1L) != 0);
-        if (__pyx_t_25) {
-        } else {
-          __pyx_t_3 = __pyx_t_25;
-          goto __pyx_L13_bool_binop_done;
+        __pyx_t_28 = (__pyx_v_height > __pyx_v_tt.first);
+        if (__pyx_t_28) {
+          __pyx_t_28 = (__pyx_v_tt.first >= 0);
         }
-        __pyx_t_23 = __pyx_v_tt.first;
-        __pyx_t_22 = __pyx_v_tt.second;
-        __pyx_t_25 = (((*__Pyx_BufPtrStrided2d(__pyx_t_5numpy_uint8_t *, __pyx_pybuffernd_img.rcbuffer->pybuffer.buf, __pyx_t_23, __pyx_pybuffernd_img.diminfo[0].strides, __pyx_t_22, __pyx_pybuffernd_img.diminfo[1].strides)) >= __pyx_v_thr) != 0);
-        if (__pyx_t_25) {
+        __pyx_t_29 = (__pyx_t_28 != 0);
+        if (__pyx_t_29) {
         } else {
-          __pyx_t_3 = __pyx_t_25;
-          goto __pyx_L13_bool_binop_done;
+          __pyx_t_3 = __pyx_t_29;
+          goto __pyx_L11_bool_binop_done;
+        }
+        __pyx_t_29 = (__pyx_v_width > __pyx_v_tt.second);
+        if (__pyx_t_29) {
+          __pyx_t_29 = (__pyx_v_tt.second >= 0);
+        }
+        __pyx_t_28 = (__pyx_t_29 != 0);
+        if (__pyx_t_28) {
+        } else {
+          __pyx_t_3 = __pyx_t_28;
+          goto __pyx_L11_bool_binop_done;
         }
 
-        /* "flake_detection/find_circles.pyx":106
+        /* "flake_detection/find_circles.pyx":109
+ *                 tt = t.first + d.first, t.second + d.second
  *                 if height > tt.first >= 0 and width > tt.second >= 0 and \
- *                         visited[tt.first, tt.second] == -1 and img[tt.first, tt.second] >= thr and \
- *                         (disks[tt.first, tt.second] == i or disks[tt.first, tt.second] == -1):             # <<<<<<<<<<<<<<
+ *                         crop[tt.first, tt.second] >= thr and flood[tt.first, tt.second] == 1:             # <<<<<<<<<<<<<<
  *                     que.push(tt)
  *                     area[i] += 1
  */
-        __pyx_t_22 = __pyx_v_tt.first;
-        __pyx_t_23 = __pyx_v_tt.second;
-        __pyx_t_25 = (((*__Pyx_BufPtrStrided2d(__pyx_t_5numpy_int32_t *, __pyx_pybuffernd_disks.rcbuffer->pybuffer.buf, __pyx_t_22, __pyx_pybuffernd_disks.diminfo[0].strides, __pyx_t_23, __pyx_pybuffernd_disks.diminfo[1].strides)) == __pyx_v_i) != 0);
-        if (!__pyx_t_25) {
+        __pyx_t_19 = __Pyx_PyInt_From_int(__pyx_v_tt.first); if (unlikely(!__pyx_t_19)) __PYX_ERR(0, 109, __pyx_L1_error)
+        __Pyx_GOTREF(__pyx_t_19);
+        __pyx_t_26 = __Pyx_PyInt_From_int(__pyx_v_tt.second); if (unlikely(!__pyx_t_26)) __PYX_ERR(0, 109, __pyx_L1_error)
+        __Pyx_GOTREF(__pyx_t_26);
+        __pyx_t_16 = PyTuple_New(2); if (unlikely(!__pyx_t_16)) __PYX_ERR(0, 109, __pyx_L1_error)
+        __Pyx_GOTREF(__pyx_t_16);
+        __Pyx_GIVEREF(__pyx_t_19);
+        PyTuple_SET_ITEM(__pyx_t_16, 0, __pyx_t_19);
+        __Pyx_GIVEREF(__pyx_t_26);
+        PyTuple_SET_ITEM(__pyx_t_16, 1, __pyx_t_26);
+        __pyx_t_19 = 0;
+        __pyx_t_26 = 0;
+        __pyx_t_26 = __Pyx_PyObject_GetItem(__pyx_v_crop, __pyx_t_16); if (unlikely(!__pyx_t_26)) __PYX_ERR(0, 109, __pyx_L1_error)
+        __Pyx_GOTREF(__pyx_t_26);
+        __Pyx_DECREF(__pyx_t_16); __pyx_t_16 = 0;
+        __pyx_t_16 = PyFloat_FromDouble(__pyx_v_thr); if (unlikely(!__pyx_t_16)) __PYX_ERR(0, 109, __pyx_L1_error)
+        __Pyx_GOTREF(__pyx_t_16);
+        __pyx_t_19 = PyObject_RichCompare(__pyx_t_26, __pyx_t_16, Py_GE); __Pyx_XGOTREF(__pyx_t_19); if (unlikely(!__pyx_t_19)) __PYX_ERR(0, 109, __pyx_L1_error)
+        __Pyx_DECREF(__pyx_t_26); __pyx_t_26 = 0;
+        __Pyx_DECREF(__pyx_t_16); __pyx_t_16 = 0;
+        __pyx_t_28 = __Pyx_PyObject_IsTrue(__pyx_t_19); if (unlikely(__pyx_t_28 < 0)) __PYX_ERR(0, 109, __pyx_L1_error)
+        __Pyx_DECREF(__pyx_t_19); __pyx_t_19 = 0;
+        if (__pyx_t_28) {
         } else {
-          __pyx_t_3 = __pyx_t_25;
-          goto __pyx_L13_bool_binop_done;
+          __pyx_t_3 = __pyx_t_28;
+          goto __pyx_L11_bool_binop_done;
         }
-        __pyx_t_23 = __pyx_v_tt.first;
-        __pyx_t_22 = __pyx_v_tt.second;
-        __pyx_t_25 = (((*__Pyx_BufPtrStrided2d(__pyx_t_5numpy_int32_t *, __pyx_pybuffernd_disks.rcbuffer->pybuffer.buf, __pyx_t_23, __pyx_pybuffernd_disks.diminfo[0].strides, __pyx_t_22, __pyx_pybuffernd_disks.diminfo[1].strides)) == -1L) != 0);
-        __pyx_t_3 = __pyx_t_25;
-        __pyx_L13_bool_binop_done:;
+        __pyx_t_30 = __pyx_v_tt.first;
+        __pyx_t_31 = __pyx_v_tt.second;
+        __pyx_t_28 = (((*__Pyx_BufPtrStrided2d(__pyx_t_5numpy_int32_t *, __pyx_pybuffernd_flood.rcbuffer->pybuffer.buf, __pyx_t_30, __pyx_pybuffernd_flood.diminfo[0].strides, __pyx_t_31, __pyx_pybuffernd_flood.diminfo[1].strides)) == 1) != 0);
+        __pyx_t_3 = __pyx_t_28;
+        __pyx_L11_bool_binop_done:;
 
-        /* "flake_detection/find_circles.pyx":104
+        /* "flake_detection/find_circles.pyx":108
  *             for d in dire:
  *                 tt = t.first + d.first, t.second + d.second
  *                 if height > tt.first >= 0 and width > tt.second >= 0 and \             # <<<<<<<<<<<<<<
- *                         visited[tt.first, tt.second] == -1 and img[tt.first, tt.second] >= thr and \
- *                         (disks[tt.first, tt.second] == i or disks[tt.first, tt.second] == -1):
+ *                         crop[tt.first, tt.second] >= thr and flood[tt.first, tt.second] == 1:
+ *                     que.push(tt)
  */
         if (__pyx_t_3) {
 
-          /* "flake_detection/find_circles.pyx":107
- *                         visited[tt.first, tt.second] == -1 and img[tt.first, tt.second] >= thr and \
- *                         (disks[tt.first, tt.second] == i or disks[tt.first, tt.second] == -1):
+          /* "flake_detection/find_circles.pyx":110
+ *                 if height > tt.first >= 0 and width > tt.second >= 0 and \
+ *                         crop[tt.first, tt.second] >= thr and flood[tt.first, tt.second] == 1:
  *                     que.push(tt)             # <<<<<<<<<<<<<<
  *                     area[i] += 1
- *                     visited[tt.first, tt.second] = i
+ *                     flood[tt.first, tt.second] = 255
  */
           __pyx_v_que.push(__pyx_v_tt);
 
-          /* "flake_detection/find_circles.pyx":108
- *                         (disks[tt.first, tt.second] == i or disks[tt.first, tt.second] == -1):
+          /* "flake_detection/find_circles.pyx":111
+ *                         crop[tt.first, tt.second] >= thr and flood[tt.first, tt.second] == 1:
  *                     que.push(tt)
  *                     area[i] += 1             # <<<<<<<<<<<<<<
- *                     visited[tt.first, tt.second] = i
+ *                     flood[tt.first, tt.second] = 255
  *             que.pop()
  */
-          __pyx_t_27 = __pyx_v_i;
-          (__pyx_v_area[__pyx_t_27]) = ((__pyx_v_area[__pyx_t_27]) + 1);
+          __pyx_t_17 = __pyx_v_i;
+          (__pyx_v_area[__pyx_t_17]) = ((__pyx_v_area[__pyx_t_17]) + 1);
 
-          /* "flake_detection/find_circles.pyx":109
+          /* "flake_detection/find_circles.pyx":112
  *                     que.push(tt)
  *                     area[i] += 1
- *                     visited[tt.first, tt.second] = i             # <<<<<<<<<<<<<<
+ *                     flood[tt.first, tt.second] = 255             # <<<<<<<<<<<<<<
  *             que.pop()
- *     return area, visited
+ *         flood[flood == 1] = 0
  */
-          __pyx_t_22 = __pyx_v_tt.first;
-          __pyx_t_23 = __pyx_v_tt.second;
-          *__Pyx_BufPtrStrided2d(__pyx_t_5numpy_int32_t *, __pyx_pybuffernd_visited.rcbuffer->pybuffer.buf, __pyx_t_22, __pyx_pybuffernd_visited.diminfo[0].strides, __pyx_t_23, __pyx_pybuffernd_visited.diminfo[1].strides) = __pyx_v_i;
+          __pyx_t_31 = __pyx_v_tt.first;
+          __pyx_t_30 = __pyx_v_tt.second;
+          *__Pyx_BufPtrStrided2d(__pyx_t_5numpy_int32_t *, __pyx_pybuffernd_flood.rcbuffer->pybuffer.buf, __pyx_t_31, __pyx_pybuffernd_flood.diminfo[0].strides, __pyx_t_30, __pyx_pybuffernd_flood.diminfo[1].strides) = 0xFF;
 
-          /* "flake_detection/find_circles.pyx":104
+          /* "flake_detection/find_circles.pyx":108
  *             for d in dire:
  *                 tt = t.first + d.first, t.second + d.second
  *                 if height > tt.first >= 0 and width > tt.second >= 0 and \             # <<<<<<<<<<<<<<
- *                         visited[tt.first, tt.second] == -1 and img[tt.first, tt.second] >= thr and \
- *                         (disks[tt.first, tt.second] == i or disks[tt.first, tt.second] == -1):
+ *                         crop[tt.first, tt.second] >= thr and flood[tt.first, tt.second] == 1:
+ *                     que.push(tt)
  */
         }
 
-        /* "flake_detection/find_circles.pyx":102
+        /* "flake_detection/find_circles.pyx":106
  *         while not que.empty():
  *             t = que.front()
  *             for d in dire:             # <<<<<<<<<<<<<<
@@ -3689,40 +3739,76 @@ static PyObject *__pyx_pf_15flake_detection_12find_circles_2area_estimate(CYTHON
  */
       }
 
-      /* "flake_detection/find_circles.pyx":110
+      /* "flake_detection/find_circles.pyx":113
  *                     area[i] += 1
- *                     visited[tt.first, tt.second] = i
+ *                     flood[tt.first, tt.second] = 255
  *             que.pop()             # <<<<<<<<<<<<<<
- *     return area, visited
- * 
+ *         flood[flood == 1] = 0
+ *         floods.append((ys, xs, flood))
  */
       __pyx_v_que.pop();
     }
+
+    /* "flake_detection/find_circles.pyx":114
+ *                     flood[tt.first, tt.second] = 255
+ *             que.pop()
+ *         flood[flood == 1] = 0             # <<<<<<<<<<<<<<
+ *         floods.append((ys, xs, flood))
+ *     return area, floods
+ */
+    __pyx_t_19 = PyObject_RichCompare(((PyObject *)__pyx_v_flood), __pyx_int_1, Py_EQ); __Pyx_XGOTREF(__pyx_t_19); if (unlikely(!__pyx_t_19)) __PYX_ERR(0, 114, __pyx_L1_error)
+    if (unlikely(PyObject_SetItem(((PyObject *)__pyx_v_flood), __pyx_t_19, __pyx_int_0) < 0)) __PYX_ERR(0, 114, __pyx_L1_error)
+    __Pyx_DECREF(__pyx_t_19); __pyx_t_19 = 0;
+
+    /* "flake_detection/find_circles.pyx":115
+ *             que.pop()
+ *         flood[flood == 1] = 0
+ *         floods.append((ys, xs, flood))             # <<<<<<<<<<<<<<
+ *     return area, floods
+ * 
+ */
+    __pyx_t_19 = __Pyx_PyInt_From_int(__pyx_v_ys); if (unlikely(!__pyx_t_19)) __PYX_ERR(0, 115, __pyx_L1_error)
+    __Pyx_GOTREF(__pyx_t_19);
+    __pyx_t_16 = __Pyx_PyInt_From_int(__pyx_v_xs); if (unlikely(!__pyx_t_16)) __PYX_ERR(0, 115, __pyx_L1_error)
+    __Pyx_GOTREF(__pyx_t_16);
+    __pyx_t_26 = PyTuple_New(3); if (unlikely(!__pyx_t_26)) __PYX_ERR(0, 115, __pyx_L1_error)
+    __Pyx_GOTREF(__pyx_t_26);
+    __Pyx_GIVEREF(__pyx_t_19);
+    PyTuple_SET_ITEM(__pyx_t_26, 0, __pyx_t_19);
+    __Pyx_GIVEREF(__pyx_t_16);
+    PyTuple_SET_ITEM(__pyx_t_26, 1, __pyx_t_16);
+    __Pyx_INCREF(((PyObject *)__pyx_v_flood));
+    __Pyx_GIVEREF(((PyObject *)__pyx_v_flood));
+    PyTuple_SET_ITEM(__pyx_t_26, 2, ((PyObject *)__pyx_v_flood));
+    __pyx_t_19 = 0;
+    __pyx_t_16 = 0;
+    __pyx_t_32 = __Pyx_PyList_Append(__pyx_v_floods, __pyx_t_26); if (unlikely(__pyx_t_32 == ((int)-1))) __PYX_ERR(0, 115, __pyx_L1_error)
+    __Pyx_DECREF(__pyx_t_26); __pyx_t_26 = 0;
   }
 
-  /* "flake_detection/find_circles.pyx":111
- *                     visited[tt.first, tt.second] = i
- *             que.pop()
- *     return area, visited             # <<<<<<<<<<<<<<
+  /* "flake_detection/find_circles.pyx":116
+ *         flood[flood == 1] = 0
+ *         floods.append((ys, xs, flood))
+ *     return area, floods             # <<<<<<<<<<<<<<
  * 
  * @cython.boundscheck(False)
  */
   __Pyx_XDECREF(__pyx_r);
-  __pyx_t_9 = __pyx_convert_vector_to_py_int(__pyx_v_area); if (unlikely(!__pyx_t_9)) __PYX_ERR(0, 111, __pyx_L1_error)
-  __Pyx_GOTREF(__pyx_t_9);
-  __pyx_t_5 = PyTuple_New(2); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 111, __pyx_L1_error)
-  __Pyx_GOTREF(__pyx_t_5);
-  __Pyx_GIVEREF(__pyx_t_9);
-  PyTuple_SET_ITEM(__pyx_t_5, 0, __pyx_t_9);
-  __Pyx_INCREF(((PyObject *)__pyx_v_visited));
-  __Pyx_GIVEREF(((PyObject *)__pyx_v_visited));
-  PyTuple_SET_ITEM(__pyx_t_5, 1, ((PyObject *)__pyx_v_visited));
-  __pyx_t_9 = 0;
-  __pyx_r = __pyx_t_5;
-  __pyx_t_5 = 0;
+  __pyx_t_26 = __pyx_convert_vector_to_py_int(__pyx_v_area); if (unlikely(!__pyx_t_26)) __PYX_ERR(0, 116, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_26);
+  __pyx_t_16 = PyTuple_New(2); if (unlikely(!__pyx_t_16)) __PYX_ERR(0, 116, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_16);
+  __Pyx_GIVEREF(__pyx_t_26);
+  PyTuple_SET_ITEM(__pyx_t_16, 0, __pyx_t_26);
+  __Pyx_INCREF(__pyx_v_floods);
+  __Pyx_GIVEREF(__pyx_v_floods);
+  PyTuple_SET_ITEM(__pyx_t_16, 1, __pyx_v_floods);
+  __pyx_t_26 = 0;
+  __pyx_r = __pyx_t_16;
+  __pyx_t_16 = 0;
   goto __pyx_L0;
 
-  /* "flake_detection/find_circles.pyx":68
+  /* "flake_detection/find_circles.pyx":67
  * @cython.nonecheck(False)
  * 
  * def area_estimate(img_py, y_py, x_py, rad_py, cutoff_ratio=0.5, lowest_cutoff=0):             # <<<<<<<<<<<<<<
@@ -3732,39 +3818,37 @@ static PyObject *__pyx_pf_15flake_detection_12find_circles_2area_estimate(CYTHON
 
   /* function exit code */
   __pyx_L1_error:;
-  __Pyx_XDECREF(__pyx_t_5);
   __Pyx_XDECREF(__pyx_t_6);
-  __Pyx_XDECREF(__pyx_t_9);
-  __Pyx_XDECREF(__pyx_t_10);
-  __Pyx_XDECREF(__pyx_t_15);
   __Pyx_XDECREF(__pyx_t_16);
-  __Pyx_XDECREF(__pyx_t_17);
   __Pyx_XDECREF(__pyx_t_18);
+  __Pyx_XDECREF(__pyx_t_19);
+  __Pyx_XDECREF(__pyx_t_25);
+  __Pyx_XDECREF(__pyx_t_26);
   { PyObject *__pyx_type, *__pyx_value, *__pyx_tb;
     __Pyx_PyThreadState_declare
     __Pyx_PyThreadState_assign
     __Pyx_ErrFetch(&__pyx_type, &__pyx_value, &__pyx_tb);
-    __Pyx_SafeReleaseBuffer(&__pyx_pybuffernd_disks.rcbuffer->pybuffer);
+    __Pyx_SafeReleaseBuffer(&__pyx_pybuffernd_flood.rcbuffer->pybuffer);
     __Pyx_SafeReleaseBuffer(&__pyx_pybuffernd_img.rcbuffer->pybuffer);
-    __Pyx_SafeReleaseBuffer(&__pyx_pybuffernd_visited.rcbuffer->pybuffer);
   __Pyx_ErrRestore(__pyx_type, __pyx_value, __pyx_tb);}
   __Pyx_AddTraceback("flake_detection.find_circles.area_estimate", __pyx_clineno, __pyx_lineno, __pyx_filename);
   __pyx_r = NULL;
   goto __pyx_L2;
   __pyx_L0:;
-  __Pyx_SafeReleaseBuffer(&__pyx_pybuffernd_disks.rcbuffer->pybuffer);
+  __Pyx_SafeReleaseBuffer(&__pyx_pybuffernd_flood.rcbuffer->pybuffer);
   __Pyx_SafeReleaseBuffer(&__pyx_pybuffernd_img.rcbuffer->pybuffer);
-  __Pyx_SafeReleaseBuffer(&__pyx_pybuffernd_visited.rcbuffer->pybuffer);
   __pyx_L2:;
   __Pyx_XDECREF((PyObject *)__pyx_v_img);
-  __Pyx_XDECREF((PyObject *)__pyx_v_disks);
-  __Pyx_XDECREF((PyObject *)__pyx_v_visited);
+  __Pyx_XDECREF((PyObject *)__pyx_v_flood);
+  __Pyx_XDECREF(__pyx_v_floods);
+  __Pyx_XDECREF(__pyx_v_xe);
+  __Pyx_XDECREF(__pyx_v_crop);
   __Pyx_XGIVEREF(__pyx_r);
   __Pyx_RefNannyFinishContext();
   return __pyx_r;
 }
 
-/* "flake_detection/find_circles.pyx":117
+/* "flake_detection/find_circles.pyx":122
  * @cython.nonecheck(False)
  * 
  * def merge_centers(img_py, y_py, x_py, gap_py=0.9, merge_dist=50):             # <<<<<<<<<<<<<<
@@ -3819,13 +3903,13 @@ static PyObject *__pyx_pw_15flake_detection_12find_circles_5merge_centers(PyObje
         case  1:
         if (likely((values[1] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_y_py)) != 0)) kw_args--;
         else {
-          __Pyx_RaiseArgtupleInvalid("merge_centers", 0, 3, 5, 1); __PYX_ERR(0, 117, __pyx_L3_error)
+          __Pyx_RaiseArgtupleInvalid("merge_centers", 0, 3, 5, 1); __PYX_ERR(0, 122, __pyx_L3_error)
         }
         CYTHON_FALLTHROUGH;
         case  2:
         if (likely((values[2] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_x_py)) != 0)) kw_args--;
         else {
-          __Pyx_RaiseArgtupleInvalid("merge_centers", 0, 3, 5, 2); __PYX_ERR(0, 117, __pyx_L3_error)
+          __Pyx_RaiseArgtupleInvalid("merge_centers", 0, 3, 5, 2); __PYX_ERR(0, 122, __pyx_L3_error)
         }
         CYTHON_FALLTHROUGH;
         case  3:
@@ -3841,7 +3925,7 @@ static PyObject *__pyx_pw_15flake_detection_12find_circles_5merge_centers(PyObje
         }
       }
       if (unlikely(kw_args > 0)) {
-        if (unlikely(__Pyx_ParseOptionalKeywords(__pyx_kwds, __pyx_pyargnames, 0, values, pos_args, "merge_centers") < 0)) __PYX_ERR(0, 117, __pyx_L3_error)
+        if (unlikely(__Pyx_ParseOptionalKeywords(__pyx_kwds, __pyx_pyargnames, 0, values, pos_args, "merge_centers") < 0)) __PYX_ERR(0, 122, __pyx_L3_error)
       }
     } else {
       switch (PyTuple_GET_SIZE(__pyx_args)) {
@@ -3864,7 +3948,7 @@ static PyObject *__pyx_pw_15flake_detection_12find_circles_5merge_centers(PyObje
   }
   goto __pyx_L4_argument_unpacking_done;
   __pyx_L5_argtuple_error:;
-  __Pyx_RaiseArgtupleInvalid("merge_centers", 0, 3, 5, PyTuple_GET_SIZE(__pyx_args)); __PYX_ERR(0, 117, __pyx_L3_error)
+  __Pyx_RaiseArgtupleInvalid("merge_centers", 0, 3, 5, PyTuple_GET_SIZE(__pyx_args)); __PYX_ERR(0, 122, __pyx_L3_error)
   __pyx_L3_error:;
   __Pyx_AddTraceback("flake_detection.find_circles.merge_centers", __pyx_clineno, __pyx_lineno, __pyx_filename);
   __Pyx_RefNannyFinishContext();
@@ -3991,7 +4075,7 @@ static PyObject *__pyx_pf_15flake_detection_12find_circles_4merge_centers(CYTHON
   __pyx_pybuffernd_tpos.data = NULL;
   __pyx_pybuffernd_tpos.rcbuffer = &__pyx_pybuffer_tpos;
 
-  /* "flake_detection/find_circles.pyx":127
+  /* "flake_detection/find_circles.pyx":132
  *     :return:
  *     """
  *     assert len(x_py) == len(y_py)             # <<<<<<<<<<<<<<
@@ -4000,16 +4084,16 @@ static PyObject *__pyx_pf_15flake_detection_12find_circles_4merge_centers(CYTHON
  */
   #ifndef CYTHON_WITHOUT_ASSERTIONS
   if (unlikely(!Py_OptimizeFlag)) {
-    __pyx_t_1 = PyObject_Length(__pyx_v_x_py); if (unlikely(__pyx_t_1 == ((Py_ssize_t)-1))) __PYX_ERR(0, 127, __pyx_L1_error)
-    __pyx_t_2 = PyObject_Length(__pyx_v_y_py); if (unlikely(__pyx_t_2 == ((Py_ssize_t)-1))) __PYX_ERR(0, 127, __pyx_L1_error)
+    __pyx_t_1 = PyObject_Length(__pyx_v_x_py); if (unlikely(__pyx_t_1 == ((Py_ssize_t)-1))) __PYX_ERR(0, 132, __pyx_L1_error)
+    __pyx_t_2 = PyObject_Length(__pyx_v_y_py); if (unlikely(__pyx_t_2 == ((Py_ssize_t)-1))) __PYX_ERR(0, 132, __pyx_L1_error)
     if (unlikely(!((__pyx_t_1 == __pyx_t_2) != 0))) {
       PyErr_SetNone(PyExc_AssertionError);
-      __PYX_ERR(0, 127, __pyx_L1_error)
+      __PYX_ERR(0, 132, __pyx_L1_error)
     }
   }
   #endif
 
-  /* "flake_detection/find_circles.pyx":128
+  /* "flake_detection/find_circles.pyx":133
  *     """
  *     assert len(x_py) == len(y_py)
  *     if not isinstance(merge_dist, list):             # <<<<<<<<<<<<<<
@@ -4020,15 +4104,15 @@ static PyObject *__pyx_pf_15flake_detection_12find_circles_4merge_centers(CYTHON
   __pyx_t_4 = ((!(__pyx_t_3 != 0)) != 0);
   if (__pyx_t_4) {
 
-    /* "flake_detection/find_circles.pyx":129
+    /* "flake_detection/find_circles.pyx":134
  *     assert len(x_py) == len(y_py)
  *     if not isinstance(merge_dist, list):
  *         merge_dist = [merge_dist] * len(y_py)             # <<<<<<<<<<<<<<
  *     cdef:
  *         int tot_cand = len(y_py), i, j, sy, sx, vmax, vmin, t
  */
-    __pyx_t_2 = PyObject_Length(__pyx_v_y_py); if (unlikely(__pyx_t_2 == ((Py_ssize_t)-1))) __PYX_ERR(0, 129, __pyx_L1_error)
-    __pyx_t_5 = PyList_New(1 * ((__pyx_t_2<0) ? 0:__pyx_t_2)); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 129, __pyx_L1_error)
+    __pyx_t_2 = PyObject_Length(__pyx_v_y_py); if (unlikely(__pyx_t_2 == ((Py_ssize_t)-1))) __PYX_ERR(0, 134, __pyx_L1_error)
+    __pyx_t_5 = PyList_New(1 * ((__pyx_t_2<0) ? 0:__pyx_t_2)); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 134, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_5);
     { Py_ssize_t __pyx_temp;
       for (__pyx_temp=0; __pyx_temp < __pyx_t_2; __pyx_temp++) {
@@ -4040,7 +4124,7 @@ static PyObject *__pyx_pf_15flake_detection_12find_circles_4merge_centers(CYTHON
     __Pyx_DECREF_SET(__pyx_v_merge_dist, __pyx_t_5);
     __pyx_t_5 = 0;
 
-    /* "flake_detection/find_circles.pyx":128
+    /* "flake_detection/find_circles.pyx":133
  *     """
  *     assert len(x_py) == len(y_py)
  *     if not isinstance(merge_dist, list):             # <<<<<<<<<<<<<<
@@ -4049,60 +4133,60 @@ static PyObject *__pyx_pf_15flake_detection_12find_circles_4merge_centers(CYTHON
  */
   }
 
-  /* "flake_detection/find_circles.pyx":131
+  /* "flake_detection/find_circles.pyx":136
  *         merge_dist = [merge_dist] * len(y_py)
  *     cdef:
  *         int tot_cand = len(y_py), i, j, sy, sx, vmax, vmin, t             # <<<<<<<<<<<<<<
  *         float gap = gap_py
  *         np.ndarray[np.uint8_t, ndim=2, cast=True] img = img_py
  */
-  __pyx_t_2 = PyObject_Length(__pyx_v_y_py); if (unlikely(__pyx_t_2 == ((Py_ssize_t)-1))) __PYX_ERR(0, 131, __pyx_L1_error)
+  __pyx_t_2 = PyObject_Length(__pyx_v_y_py); if (unlikely(__pyx_t_2 == ((Py_ssize_t)-1))) __PYX_ERR(0, 136, __pyx_L1_error)
   __pyx_v_tot_cand = __pyx_t_2;
 
-  /* "flake_detection/find_circles.pyx":132
+  /* "flake_detection/find_circles.pyx":137
  *     cdef:
  *         int tot_cand = len(y_py), i, j, sy, sx, vmax, vmin, t
  *         float gap = gap_py             # <<<<<<<<<<<<<<
  *         np.ndarray[np.uint8_t, ndim=2, cast=True] img = img_py
  *         np.ndarray[np.int64_t, ndim=2] data = np.transpose([y_py, x_py])
  */
-  __pyx_t_6 = __pyx_PyFloat_AsFloat(__pyx_v_gap_py); if (unlikely((__pyx_t_6 == (float)-1) && PyErr_Occurred())) __PYX_ERR(0, 132, __pyx_L1_error)
+  __pyx_t_6 = __pyx_PyFloat_AsFloat(__pyx_v_gap_py); if (unlikely((__pyx_t_6 == (float)-1) && PyErr_Occurred())) __PYX_ERR(0, 137, __pyx_L1_error)
   __pyx_v_gap = __pyx_t_6;
 
-  /* "flake_detection/find_circles.pyx":133
+  /* "flake_detection/find_circles.pyx":138
  *         int tot_cand = len(y_py), i, j, sy, sx, vmax, vmin, t
  *         float gap = gap_py
  *         np.ndarray[np.uint8_t, ndim=2, cast=True] img = img_py             # <<<<<<<<<<<<<<
  *         np.ndarray[np.int64_t, ndim=2] data = np.transpose([y_py, x_py])
  *         vector[vector[int]] conn = [tuple()] * tot_cand
  */
-  if (!(likely(((__pyx_v_img_py) == Py_None) || likely(__Pyx_TypeTest(__pyx_v_img_py, __pyx_ptype_5numpy_ndarray))))) __PYX_ERR(0, 133, __pyx_L1_error)
+  if (!(likely(((__pyx_v_img_py) == Py_None) || likely(__Pyx_TypeTest(__pyx_v_img_py, __pyx_ptype_5numpy_ndarray))))) __PYX_ERR(0, 138, __pyx_L1_error)
   __pyx_t_5 = __pyx_v_img_py;
   __Pyx_INCREF(__pyx_t_5);
   {
     __Pyx_BufFmt_StackElem __pyx_stack[1];
     if (unlikely(__Pyx_GetBufferAndValidate(&__pyx_pybuffernd_img.rcbuffer->pybuffer, (PyObject*)((PyArrayObject *)__pyx_t_5), &__Pyx_TypeInfo_nn___pyx_t_5numpy_uint8_t, PyBUF_FORMAT| PyBUF_STRIDES, 2, 1, __pyx_stack) == -1)) {
       __pyx_v_img = ((PyArrayObject *)Py_None); __Pyx_INCREF(Py_None); __pyx_pybuffernd_img.rcbuffer->pybuffer.buf = NULL;
-      __PYX_ERR(0, 133, __pyx_L1_error)
+      __PYX_ERR(0, 138, __pyx_L1_error)
     } else {__pyx_pybuffernd_img.diminfo[0].strides = __pyx_pybuffernd_img.rcbuffer->pybuffer.strides[0]; __pyx_pybuffernd_img.diminfo[0].shape = __pyx_pybuffernd_img.rcbuffer->pybuffer.shape[0]; __pyx_pybuffernd_img.diminfo[1].strides = __pyx_pybuffernd_img.rcbuffer->pybuffer.strides[1]; __pyx_pybuffernd_img.diminfo[1].shape = __pyx_pybuffernd_img.rcbuffer->pybuffer.shape[1];
     }
   }
   __pyx_v_img = ((PyArrayObject *)__pyx_t_5);
   __pyx_t_5 = 0;
 
-  /* "flake_detection/find_circles.pyx":134
+  /* "flake_detection/find_circles.pyx":139
  *         float gap = gap_py
  *         np.ndarray[np.uint8_t, ndim=2, cast=True] img = img_py
  *         np.ndarray[np.int64_t, ndim=2] data = np.transpose([y_py, x_py])             # <<<<<<<<<<<<<<
  *         vector[vector[int]] conn = [tuple()] * tot_cand
  *         bint flag
  */
-  __Pyx_GetModuleGlobalName(__pyx_t_7, __pyx_n_s_np); if (unlikely(!__pyx_t_7)) __PYX_ERR(0, 134, __pyx_L1_error)
+  __Pyx_GetModuleGlobalName(__pyx_t_7, __pyx_n_s_np); if (unlikely(!__pyx_t_7)) __PYX_ERR(0, 139, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_7);
-  __pyx_t_8 = __Pyx_PyObject_GetAttrStr(__pyx_t_7, __pyx_n_s_transpose); if (unlikely(!__pyx_t_8)) __PYX_ERR(0, 134, __pyx_L1_error)
+  __pyx_t_8 = __Pyx_PyObject_GetAttrStr(__pyx_t_7, __pyx_n_s_transpose); if (unlikely(!__pyx_t_8)) __PYX_ERR(0, 139, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_8);
   __Pyx_DECREF(__pyx_t_7); __pyx_t_7 = 0;
-  __pyx_t_7 = PyList_New(2); if (unlikely(!__pyx_t_7)) __PYX_ERR(0, 134, __pyx_L1_error)
+  __pyx_t_7 = PyList_New(2); if (unlikely(!__pyx_t_7)) __PYX_ERR(0, 139, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_7);
   __Pyx_INCREF(__pyx_v_y_py);
   __Pyx_GIVEREF(__pyx_v_y_py);
@@ -4123,16 +4207,16 @@ static PyObject *__pyx_pf_15flake_detection_12find_circles_4merge_centers(CYTHON
   __pyx_t_5 = (__pyx_t_9) ? __Pyx_PyObject_Call2Args(__pyx_t_8, __pyx_t_9, __pyx_t_7) : __Pyx_PyObject_CallOneArg(__pyx_t_8, __pyx_t_7);
   __Pyx_XDECREF(__pyx_t_9); __pyx_t_9 = 0;
   __Pyx_DECREF(__pyx_t_7); __pyx_t_7 = 0;
-  if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 134, __pyx_L1_error)
+  if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 139, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_5);
   __Pyx_DECREF(__pyx_t_8); __pyx_t_8 = 0;
-  if (!(likely(((__pyx_t_5) == Py_None) || likely(__Pyx_TypeTest(__pyx_t_5, __pyx_ptype_5numpy_ndarray))))) __PYX_ERR(0, 134, __pyx_L1_error)
+  if (!(likely(((__pyx_t_5) == Py_None) || likely(__Pyx_TypeTest(__pyx_t_5, __pyx_ptype_5numpy_ndarray))))) __PYX_ERR(0, 139, __pyx_L1_error)
   __pyx_t_10 = ((PyArrayObject *)__pyx_t_5);
   {
     __Pyx_BufFmt_StackElem __pyx_stack[1];
     if (unlikely(__Pyx_GetBufferAndValidate(&__pyx_pybuffernd_data.rcbuffer->pybuffer, (PyObject*)__pyx_t_10, &__Pyx_TypeInfo_nn___pyx_t_5numpy_int64_t, PyBUF_FORMAT| PyBUF_STRIDES, 2, 0, __pyx_stack) == -1)) {
       __pyx_v_data = ((PyArrayObject *)Py_None); __Pyx_INCREF(Py_None); __pyx_pybuffernd_data.rcbuffer->pybuffer.buf = NULL;
-      __PYX_ERR(0, 134, __pyx_L1_error)
+      __PYX_ERR(0, 139, __pyx_L1_error)
     } else {__pyx_pybuffernd_data.diminfo[0].strides = __pyx_pybuffernd_data.rcbuffer->pybuffer.strides[0]; __pyx_pybuffernd_data.diminfo[0].shape = __pyx_pybuffernd_data.rcbuffer->pybuffer.shape[0]; __pyx_pybuffernd_data.diminfo[1].strides = __pyx_pybuffernd_data.rcbuffer->pybuffer.strides[1]; __pyx_pybuffernd_data.diminfo[1].shape = __pyx_pybuffernd_data.rcbuffer->pybuffer.shape[1];
     }
   }
@@ -4140,16 +4224,16 @@ static PyObject *__pyx_pf_15flake_detection_12find_circles_4merge_centers(CYTHON
   __pyx_v_data = ((PyArrayObject *)__pyx_t_5);
   __pyx_t_5 = 0;
 
-  /* "flake_detection/find_circles.pyx":135
+  /* "flake_detection/find_circles.pyx":140
  *         np.ndarray[np.uint8_t, ndim=2, cast=True] img = img_py
  *         np.ndarray[np.int64_t, ndim=2] data = np.transpose([y_py, x_py])
  *         vector[vector[int]] conn = [tuple()] * tot_cand             # <<<<<<<<<<<<<<
  *         bint flag
  *         np.ndarray[np.int64_t, ndim=1] start_pos, end_pos, k, pos, tpos
  */
-  __pyx_t_5 = __Pyx_PyObject_CallNoArg(((PyObject *)(&PyTuple_Type))); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 135, __pyx_L1_error)
+  __pyx_t_5 = __Pyx_PyObject_CallNoArg(((PyObject *)(&PyTuple_Type))); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 140, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_5);
-  __pyx_t_8 = PyList_New(1 * ((__pyx_v_tot_cand<0) ? 0:__pyx_v_tot_cand)); if (unlikely(!__pyx_t_8)) __PYX_ERR(0, 135, __pyx_L1_error)
+  __pyx_t_8 = PyList_New(1 * ((__pyx_v_tot_cand<0) ? 0:__pyx_v_tot_cand)); if (unlikely(!__pyx_t_8)) __PYX_ERR(0, 140, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_8);
   { Py_ssize_t __pyx_temp;
     for (__pyx_temp=0; __pyx_temp < __pyx_v_tot_cand; __pyx_temp++) {
@@ -4159,18 +4243,18 @@ static PyObject *__pyx_pf_15flake_detection_12find_circles_4merge_centers(CYTHON
     }
   }
   __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
-  __pyx_t_11 = __pyx_convert_vector_from_py_std_3a__3a_vector_3c_int_3e___(__pyx_t_8); if (unlikely(PyErr_Occurred())) __PYX_ERR(0, 135, __pyx_L1_error)
+  __pyx_t_11 = __pyx_convert_vector_from_py_std_3a__3a_vector_3c_int_3e___(__pyx_t_8); if (unlikely(PyErr_Occurred())) __PYX_ERR(0, 140, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_8); __pyx_t_8 = 0;
   __pyx_v_conn = __pyx_t_11;
 
-  /* "flake_detection/find_circles.pyx":138
+  /* "flake_detection/find_circles.pyx":143
  *         bint flag
  *         np.ndarray[np.int64_t, ndim=1] start_pos, end_pos, k, pos, tpos
  *         vector[bint] flags = [False] * tot_cand             # <<<<<<<<<<<<<<
  *         vector[int] ans_y, ans_x, current_node
  *         queue[int] que
  */
-  __pyx_t_8 = PyList_New(1 * ((__pyx_v_tot_cand<0) ? 0:__pyx_v_tot_cand)); if (unlikely(!__pyx_t_8)) __PYX_ERR(0, 138, __pyx_L1_error)
+  __pyx_t_8 = PyList_New(1 * ((__pyx_v_tot_cand<0) ? 0:__pyx_v_tot_cand)); if (unlikely(!__pyx_t_8)) __PYX_ERR(0, 143, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_8);
   { Py_ssize_t __pyx_temp;
     for (__pyx_temp=0; __pyx_temp < __pyx_v_tot_cand; __pyx_temp++) {
@@ -4179,18 +4263,18 @@ static PyObject *__pyx_pf_15flake_detection_12find_circles_4merge_centers(CYTHON
       PyList_SET_ITEM(__pyx_t_8, __pyx_temp, Py_False);
     }
   }
-  __pyx_t_12 = __pyx_convert_vector_from_py_int(__pyx_t_8); if (unlikely(PyErr_Occurred())) __PYX_ERR(0, 138, __pyx_L1_error)
+  __pyx_t_12 = __pyx_convert_vector_from_py_int(__pyx_t_8); if (unlikely(PyErr_Occurred())) __PYX_ERR(0, 143, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_8); __pyx_t_8 = 0;
   __pyx_v_flags = __pyx_t_12;
 
-  /* "flake_detection/find_circles.pyx":141
+  /* "flake_detection/find_circles.pyx":146
  *         vector[int] ans_y, ans_x, current_node
  *         queue[int] que
  *     tree = KDTree(data)             # <<<<<<<<<<<<<<
  *     query = []
  *     for y, x, d in zip(y_py, x_py, merge_dist):
  */
-  __Pyx_GetModuleGlobalName(__pyx_t_5, __pyx_n_s_KDTree); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 141, __pyx_L1_error)
+  __Pyx_GetModuleGlobalName(__pyx_t_5, __pyx_n_s_KDTree); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 146, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_5);
   __pyx_t_7 = NULL;
   if (CYTHON_UNPACK_METHODS && unlikely(PyMethod_Check(__pyx_t_5))) {
@@ -4204,32 +4288,32 @@ static PyObject *__pyx_pf_15flake_detection_12find_circles_4merge_centers(CYTHON
   }
   __pyx_t_8 = (__pyx_t_7) ? __Pyx_PyObject_Call2Args(__pyx_t_5, __pyx_t_7, ((PyObject *)__pyx_v_data)) : __Pyx_PyObject_CallOneArg(__pyx_t_5, ((PyObject *)__pyx_v_data));
   __Pyx_XDECREF(__pyx_t_7); __pyx_t_7 = 0;
-  if (unlikely(!__pyx_t_8)) __PYX_ERR(0, 141, __pyx_L1_error)
+  if (unlikely(!__pyx_t_8)) __PYX_ERR(0, 146, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_8);
   __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
   __pyx_v_tree = __pyx_t_8;
   __pyx_t_8 = 0;
 
-  /* "flake_detection/find_circles.pyx":142
+  /* "flake_detection/find_circles.pyx":147
  *         queue[int] que
  *     tree = KDTree(data)
  *     query = []             # <<<<<<<<<<<<<<
  *     for y, x, d in zip(y_py, x_py, merge_dist):
  *         query.append(tree.query_radius([[y, x]], d)[0])
  */
-  __pyx_t_8 = PyList_New(0); if (unlikely(!__pyx_t_8)) __PYX_ERR(0, 142, __pyx_L1_error)
+  __pyx_t_8 = PyList_New(0); if (unlikely(!__pyx_t_8)) __PYX_ERR(0, 147, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_8);
   __pyx_v_query = ((PyObject*)__pyx_t_8);
   __pyx_t_8 = 0;
 
-  /* "flake_detection/find_circles.pyx":143
+  /* "flake_detection/find_circles.pyx":148
  *     tree = KDTree(data)
  *     query = []
  *     for y, x, d in zip(y_py, x_py, merge_dist):             # <<<<<<<<<<<<<<
  *         query.append(tree.query_radius([[y, x]], d)[0])
  *     for i in range(len(query)):
  */
-  __pyx_t_8 = PyTuple_New(3); if (unlikely(!__pyx_t_8)) __PYX_ERR(0, 143, __pyx_L1_error)
+  __pyx_t_8 = PyTuple_New(3); if (unlikely(!__pyx_t_8)) __PYX_ERR(0, 148, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_8);
   __Pyx_INCREF(__pyx_v_y_py);
   __Pyx_GIVEREF(__pyx_v_y_py);
@@ -4240,16 +4324,16 @@ static PyObject *__pyx_pf_15flake_detection_12find_circles_4merge_centers(CYTHON
   __Pyx_INCREF(__pyx_v_merge_dist);
   __Pyx_GIVEREF(__pyx_v_merge_dist);
   PyTuple_SET_ITEM(__pyx_t_8, 2, __pyx_v_merge_dist);
-  __pyx_t_5 = __Pyx_PyObject_Call(__pyx_builtin_zip, __pyx_t_8, NULL); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 143, __pyx_L1_error)
+  __pyx_t_5 = __Pyx_PyObject_Call(__pyx_builtin_zip, __pyx_t_8, NULL); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 148, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_5);
   __Pyx_DECREF(__pyx_t_8); __pyx_t_8 = 0;
   if (likely(PyList_CheckExact(__pyx_t_5)) || PyTuple_CheckExact(__pyx_t_5)) {
     __pyx_t_8 = __pyx_t_5; __Pyx_INCREF(__pyx_t_8); __pyx_t_2 = 0;
     __pyx_t_13 = NULL;
   } else {
-    __pyx_t_2 = -1; __pyx_t_8 = PyObject_GetIter(__pyx_t_5); if (unlikely(!__pyx_t_8)) __PYX_ERR(0, 143, __pyx_L1_error)
+    __pyx_t_2 = -1; __pyx_t_8 = PyObject_GetIter(__pyx_t_5); if (unlikely(!__pyx_t_8)) __PYX_ERR(0, 148, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_8);
-    __pyx_t_13 = Py_TYPE(__pyx_t_8)->tp_iternext; if (unlikely(!__pyx_t_13)) __PYX_ERR(0, 143, __pyx_L1_error)
+    __pyx_t_13 = Py_TYPE(__pyx_t_8)->tp_iternext; if (unlikely(!__pyx_t_13)) __PYX_ERR(0, 148, __pyx_L1_error)
   }
   __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
   for (;;) {
@@ -4257,17 +4341,17 @@ static PyObject *__pyx_pf_15flake_detection_12find_circles_4merge_centers(CYTHON
       if (likely(PyList_CheckExact(__pyx_t_8))) {
         if (__pyx_t_2 >= PyList_GET_SIZE(__pyx_t_8)) break;
         #if CYTHON_ASSUME_SAFE_MACROS && !CYTHON_AVOID_BORROWED_REFS
-        __pyx_t_5 = PyList_GET_ITEM(__pyx_t_8, __pyx_t_2); __Pyx_INCREF(__pyx_t_5); __pyx_t_2++; if (unlikely(0 < 0)) __PYX_ERR(0, 143, __pyx_L1_error)
+        __pyx_t_5 = PyList_GET_ITEM(__pyx_t_8, __pyx_t_2); __Pyx_INCREF(__pyx_t_5); __pyx_t_2++; if (unlikely(0 < 0)) __PYX_ERR(0, 148, __pyx_L1_error)
         #else
-        __pyx_t_5 = PySequence_ITEM(__pyx_t_8, __pyx_t_2); __pyx_t_2++; if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 143, __pyx_L1_error)
+        __pyx_t_5 = PySequence_ITEM(__pyx_t_8, __pyx_t_2); __pyx_t_2++; if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 148, __pyx_L1_error)
         __Pyx_GOTREF(__pyx_t_5);
         #endif
       } else {
         if (__pyx_t_2 >= PyTuple_GET_SIZE(__pyx_t_8)) break;
         #if CYTHON_ASSUME_SAFE_MACROS && !CYTHON_AVOID_BORROWED_REFS
-        __pyx_t_5 = PyTuple_GET_ITEM(__pyx_t_8, __pyx_t_2); __Pyx_INCREF(__pyx_t_5); __pyx_t_2++; if (unlikely(0 < 0)) __PYX_ERR(0, 143, __pyx_L1_error)
+        __pyx_t_5 = PyTuple_GET_ITEM(__pyx_t_8, __pyx_t_2); __Pyx_INCREF(__pyx_t_5); __pyx_t_2++; if (unlikely(0 < 0)) __PYX_ERR(0, 148, __pyx_L1_error)
         #else
-        __pyx_t_5 = PySequence_ITEM(__pyx_t_8, __pyx_t_2); __pyx_t_2++; if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 143, __pyx_L1_error)
+        __pyx_t_5 = PySequence_ITEM(__pyx_t_8, __pyx_t_2); __pyx_t_2++; if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 148, __pyx_L1_error)
         __Pyx_GOTREF(__pyx_t_5);
         #endif
       }
@@ -4277,7 +4361,7 @@ static PyObject *__pyx_pf_15flake_detection_12find_circles_4merge_centers(CYTHON
         PyObject* exc_type = PyErr_Occurred();
         if (exc_type) {
           if (likely(__Pyx_PyErr_GivenExceptionMatches(exc_type, PyExc_StopIteration))) PyErr_Clear();
-          else __PYX_ERR(0, 143, __pyx_L1_error)
+          else __PYX_ERR(0, 148, __pyx_L1_error)
         }
         break;
       }
@@ -4289,7 +4373,7 @@ static PyObject *__pyx_pf_15flake_detection_12find_circles_4merge_centers(CYTHON
       if (unlikely(size != 3)) {
         if (size > 3) __Pyx_RaiseTooManyValuesError(3);
         else if (size >= 0) __Pyx_RaiseNeedMoreValuesError(size);
-        __PYX_ERR(0, 143, __pyx_L1_error)
+        __PYX_ERR(0, 148, __pyx_L1_error)
       }
       #if CYTHON_ASSUME_SAFE_MACROS && !CYTHON_AVOID_BORROWED_REFS
       if (likely(PyTuple_CheckExact(sequence))) {
@@ -4305,17 +4389,17 @@ static PyObject *__pyx_pf_15flake_detection_12find_circles_4merge_centers(CYTHON
       __Pyx_INCREF(__pyx_t_9);
       __Pyx_INCREF(__pyx_t_14);
       #else
-      __pyx_t_7 = PySequence_ITEM(sequence, 0); if (unlikely(!__pyx_t_7)) __PYX_ERR(0, 143, __pyx_L1_error)
+      __pyx_t_7 = PySequence_ITEM(sequence, 0); if (unlikely(!__pyx_t_7)) __PYX_ERR(0, 148, __pyx_L1_error)
       __Pyx_GOTREF(__pyx_t_7);
-      __pyx_t_9 = PySequence_ITEM(sequence, 1); if (unlikely(!__pyx_t_9)) __PYX_ERR(0, 143, __pyx_L1_error)
+      __pyx_t_9 = PySequence_ITEM(sequence, 1); if (unlikely(!__pyx_t_9)) __PYX_ERR(0, 148, __pyx_L1_error)
       __Pyx_GOTREF(__pyx_t_9);
-      __pyx_t_14 = PySequence_ITEM(sequence, 2); if (unlikely(!__pyx_t_14)) __PYX_ERR(0, 143, __pyx_L1_error)
+      __pyx_t_14 = PySequence_ITEM(sequence, 2); if (unlikely(!__pyx_t_14)) __PYX_ERR(0, 148, __pyx_L1_error)
       __Pyx_GOTREF(__pyx_t_14);
       #endif
       __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
     } else {
       Py_ssize_t index = -1;
-      __pyx_t_15 = PyObject_GetIter(__pyx_t_5); if (unlikely(!__pyx_t_15)) __PYX_ERR(0, 143, __pyx_L1_error)
+      __pyx_t_15 = PyObject_GetIter(__pyx_t_5); if (unlikely(!__pyx_t_15)) __PYX_ERR(0, 148, __pyx_L1_error)
       __Pyx_GOTREF(__pyx_t_15);
       __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
       __pyx_t_16 = Py_TYPE(__pyx_t_15)->tp_iternext;
@@ -4325,7 +4409,7 @@ static PyObject *__pyx_pf_15flake_detection_12find_circles_4merge_centers(CYTHON
       __Pyx_GOTREF(__pyx_t_9);
       index = 2; __pyx_t_14 = __pyx_t_16(__pyx_t_15); if (unlikely(!__pyx_t_14)) goto __pyx_L6_unpacking_failed;
       __Pyx_GOTREF(__pyx_t_14);
-      if (__Pyx_IternextUnpackEndCheck(__pyx_t_16(__pyx_t_15), 3) < 0) __PYX_ERR(0, 143, __pyx_L1_error)
+      if (__Pyx_IternextUnpackEndCheck(__pyx_t_16(__pyx_t_15), 3) < 0) __PYX_ERR(0, 148, __pyx_L1_error)
       __pyx_t_16 = NULL;
       __Pyx_DECREF(__pyx_t_15); __pyx_t_15 = 0;
       goto __pyx_L7_unpacking_done;
@@ -4333,7 +4417,7 @@ static PyObject *__pyx_pf_15flake_detection_12find_circles_4merge_centers(CYTHON
       __Pyx_DECREF(__pyx_t_15); __pyx_t_15 = 0;
       __pyx_t_16 = NULL;
       if (__Pyx_IterFinish() == 0) __Pyx_RaiseNeedMoreValuesError(index);
-      __PYX_ERR(0, 143, __pyx_L1_error)
+      __PYX_ERR(0, 148, __pyx_L1_error)
       __pyx_L7_unpacking_done:;
     }
     __Pyx_XDECREF_SET(__pyx_v_y, __pyx_t_7);
@@ -4343,16 +4427,16 @@ static PyObject *__pyx_pf_15flake_detection_12find_circles_4merge_centers(CYTHON
     __Pyx_XDECREF_SET(__pyx_v_d, __pyx_t_14);
     __pyx_t_14 = 0;
 
-    /* "flake_detection/find_circles.pyx":144
+    /* "flake_detection/find_circles.pyx":149
  *     query = []
  *     for y, x, d in zip(y_py, x_py, merge_dist):
  *         query.append(tree.query_radius([[y, x]], d)[0])             # <<<<<<<<<<<<<<
  *     for i in range(len(query)):
  *         start_pos = data[i]
  */
-    __pyx_t_14 = __Pyx_PyObject_GetAttrStr(__pyx_v_tree, __pyx_n_s_query_radius); if (unlikely(!__pyx_t_14)) __PYX_ERR(0, 144, __pyx_L1_error)
+    __pyx_t_14 = __Pyx_PyObject_GetAttrStr(__pyx_v_tree, __pyx_n_s_query_radius); if (unlikely(!__pyx_t_14)) __PYX_ERR(0, 149, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_14);
-    __pyx_t_9 = PyList_New(2); if (unlikely(!__pyx_t_9)) __PYX_ERR(0, 144, __pyx_L1_error)
+    __pyx_t_9 = PyList_New(2); if (unlikely(!__pyx_t_9)) __PYX_ERR(0, 149, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_9);
     __Pyx_INCREF(__pyx_v_y);
     __Pyx_GIVEREF(__pyx_v_y);
@@ -4360,7 +4444,7 @@ static PyObject *__pyx_pf_15flake_detection_12find_circles_4merge_centers(CYTHON
     __Pyx_INCREF(__pyx_v_x);
     __Pyx_GIVEREF(__pyx_v_x);
     PyList_SET_ITEM(__pyx_t_9, 1, __pyx_v_x);
-    __pyx_t_7 = PyList_New(1); if (unlikely(!__pyx_t_7)) __PYX_ERR(0, 144, __pyx_L1_error)
+    __pyx_t_7 = PyList_New(1); if (unlikely(!__pyx_t_7)) __PYX_ERR(0, 149, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_7);
     __Pyx_GIVEREF(__pyx_t_9);
     PyList_SET_ITEM(__pyx_t_7, 0, __pyx_t_9);
@@ -4380,7 +4464,7 @@ static PyObject *__pyx_pf_15flake_detection_12find_circles_4merge_centers(CYTHON
     #if CYTHON_FAST_PYCALL
     if (PyFunction_Check(__pyx_t_14)) {
       PyObject *__pyx_temp[3] = {__pyx_t_9, __pyx_t_7, __pyx_v_d};
-      __pyx_t_5 = __Pyx_PyFunction_FastCall(__pyx_t_14, __pyx_temp+1-__pyx_t_17, 2+__pyx_t_17); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 144, __pyx_L1_error)
+      __pyx_t_5 = __Pyx_PyFunction_FastCall(__pyx_t_14, __pyx_temp+1-__pyx_t_17, 2+__pyx_t_17); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 149, __pyx_L1_error)
       __Pyx_XDECREF(__pyx_t_9); __pyx_t_9 = 0;
       __Pyx_GOTREF(__pyx_t_5);
       __Pyx_DECREF(__pyx_t_7); __pyx_t_7 = 0;
@@ -4389,14 +4473,14 @@ static PyObject *__pyx_pf_15flake_detection_12find_circles_4merge_centers(CYTHON
     #if CYTHON_FAST_PYCCALL
     if (__Pyx_PyFastCFunction_Check(__pyx_t_14)) {
       PyObject *__pyx_temp[3] = {__pyx_t_9, __pyx_t_7, __pyx_v_d};
-      __pyx_t_5 = __Pyx_PyCFunction_FastCall(__pyx_t_14, __pyx_temp+1-__pyx_t_17, 2+__pyx_t_17); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 144, __pyx_L1_error)
+      __pyx_t_5 = __Pyx_PyCFunction_FastCall(__pyx_t_14, __pyx_temp+1-__pyx_t_17, 2+__pyx_t_17); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 149, __pyx_L1_error)
       __Pyx_XDECREF(__pyx_t_9); __pyx_t_9 = 0;
       __Pyx_GOTREF(__pyx_t_5);
       __Pyx_DECREF(__pyx_t_7); __pyx_t_7 = 0;
     } else
     #endif
     {
-      __pyx_t_15 = PyTuple_New(2+__pyx_t_17); if (unlikely(!__pyx_t_15)) __PYX_ERR(0, 144, __pyx_L1_error)
+      __pyx_t_15 = PyTuple_New(2+__pyx_t_17); if (unlikely(!__pyx_t_15)) __PYX_ERR(0, 149, __pyx_L1_error)
       __Pyx_GOTREF(__pyx_t_15);
       if (__pyx_t_9) {
         __Pyx_GIVEREF(__pyx_t_9); PyTuple_SET_ITEM(__pyx_t_15, 0, __pyx_t_9); __pyx_t_9 = NULL;
@@ -4407,18 +4491,18 @@ static PyObject *__pyx_pf_15flake_detection_12find_circles_4merge_centers(CYTHON
       __Pyx_GIVEREF(__pyx_v_d);
       PyTuple_SET_ITEM(__pyx_t_15, 1+__pyx_t_17, __pyx_v_d);
       __pyx_t_7 = 0;
-      __pyx_t_5 = __Pyx_PyObject_Call(__pyx_t_14, __pyx_t_15, NULL); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 144, __pyx_L1_error)
+      __pyx_t_5 = __Pyx_PyObject_Call(__pyx_t_14, __pyx_t_15, NULL); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 149, __pyx_L1_error)
       __Pyx_GOTREF(__pyx_t_5);
       __Pyx_DECREF(__pyx_t_15); __pyx_t_15 = 0;
     }
     __Pyx_DECREF(__pyx_t_14); __pyx_t_14 = 0;
-    __pyx_t_14 = __Pyx_GetItemInt(__pyx_t_5, 0, long, 1, __Pyx_PyInt_From_long, 0, 0, 0); if (unlikely(!__pyx_t_14)) __PYX_ERR(0, 144, __pyx_L1_error)
+    __pyx_t_14 = __Pyx_GetItemInt(__pyx_t_5, 0, long, 1, __Pyx_PyInt_From_long, 0, 0, 0); if (unlikely(!__pyx_t_14)) __PYX_ERR(0, 149, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_14);
     __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
-    __pyx_t_18 = __Pyx_PyList_Append(__pyx_v_query, __pyx_t_14); if (unlikely(__pyx_t_18 == ((int)-1))) __PYX_ERR(0, 144, __pyx_L1_error)
+    __pyx_t_18 = __Pyx_PyList_Append(__pyx_v_query, __pyx_t_14); if (unlikely(__pyx_t_18 == ((int)-1))) __PYX_ERR(0, 149, __pyx_L1_error)
     __Pyx_DECREF(__pyx_t_14); __pyx_t_14 = 0;
 
-    /* "flake_detection/find_circles.pyx":143
+    /* "flake_detection/find_circles.pyx":148
  *     tree = KDTree(data)
  *     query = []
  *     for y, x, d in zip(y_py, x_py, merge_dist):             # <<<<<<<<<<<<<<
@@ -4428,28 +4512,28 @@ static PyObject *__pyx_pf_15flake_detection_12find_circles_4merge_centers(CYTHON
   }
   __Pyx_DECREF(__pyx_t_8); __pyx_t_8 = 0;
 
-  /* "flake_detection/find_circles.pyx":145
+  /* "flake_detection/find_circles.pyx":150
  *     for y, x, d in zip(y_py, x_py, merge_dist):
  *         query.append(tree.query_radius([[y, x]], d)[0])
  *     for i in range(len(query)):             # <<<<<<<<<<<<<<
  *         start_pos = data[i]
  *         for j in query[i]:
  */
-  __pyx_t_2 = PyList_GET_SIZE(__pyx_v_query); if (unlikely(__pyx_t_2 == ((Py_ssize_t)-1))) __PYX_ERR(0, 145, __pyx_L1_error)
+  __pyx_t_2 = PyList_GET_SIZE(__pyx_v_query); if (unlikely(__pyx_t_2 == ((Py_ssize_t)-1))) __PYX_ERR(0, 150, __pyx_L1_error)
   __pyx_t_1 = __pyx_t_2;
   for (__pyx_t_17 = 0; __pyx_t_17 < __pyx_t_1; __pyx_t_17+=1) {
     __pyx_v_i = __pyx_t_17;
 
-    /* "flake_detection/find_circles.pyx":146
+    /* "flake_detection/find_circles.pyx":151
  *         query.append(tree.query_radius([[y, x]], d)[0])
  *     for i in range(len(query)):
  *         start_pos = data[i]             # <<<<<<<<<<<<<<
  *         for j in query[i]:
  *             if j == i:
  */
-    __pyx_t_8 = __Pyx_GetItemInt(((PyObject *)__pyx_v_data), __pyx_v_i, int, 1, __Pyx_PyInt_From_int, 0, 0, 0); if (unlikely(!__pyx_t_8)) __PYX_ERR(0, 146, __pyx_L1_error)
+    __pyx_t_8 = __Pyx_GetItemInt(((PyObject *)__pyx_v_data), __pyx_v_i, int, 1, __Pyx_PyInt_From_int, 0, 0, 0); if (unlikely(!__pyx_t_8)) __PYX_ERR(0, 151, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_8);
-    if (!(likely(((__pyx_t_8) == Py_None) || likely(__Pyx_TypeTest(__pyx_t_8, __pyx_ptype_5numpy_ndarray))))) __PYX_ERR(0, 146, __pyx_L1_error)
+    if (!(likely(((__pyx_t_8) == Py_None) || likely(__Pyx_TypeTest(__pyx_t_8, __pyx_ptype_5numpy_ndarray))))) __PYX_ERR(0, 151, __pyx_L1_error)
     __pyx_t_19 = ((PyArrayObject *)__pyx_t_8);
     {
       __Pyx_BufFmt_StackElem __pyx_stack[1];
@@ -4466,13 +4550,13 @@ static PyObject *__pyx_pf_15flake_detection_12find_circles_4merge_centers(CYTHON
         __pyx_t_21 = __pyx_t_22 = __pyx_t_23 = 0;
       }
       __pyx_pybuffernd_start_pos.diminfo[0].strides = __pyx_pybuffernd_start_pos.rcbuffer->pybuffer.strides[0]; __pyx_pybuffernd_start_pos.diminfo[0].shape = __pyx_pybuffernd_start_pos.rcbuffer->pybuffer.shape[0];
-      if (unlikely(__pyx_t_20 < 0)) __PYX_ERR(0, 146, __pyx_L1_error)
+      if (unlikely(__pyx_t_20 < 0)) __PYX_ERR(0, 151, __pyx_L1_error)
     }
     __pyx_t_19 = 0;
     __Pyx_XDECREF_SET(__pyx_v_start_pos, ((PyArrayObject *)__pyx_t_8));
     __pyx_t_8 = 0;
 
-    /* "flake_detection/find_circles.pyx":147
+    /* "flake_detection/find_circles.pyx":152
  *     for i in range(len(query)):
  *         start_pos = data[i]
  *         for j in query[i]:             # <<<<<<<<<<<<<<
@@ -4483,26 +4567,26 @@ static PyObject *__pyx_pf_15flake_detection_12find_circles_4merge_centers(CYTHON
       __pyx_t_8 = PyList_GET_ITEM(__pyx_v_query, __pyx_v_i); __Pyx_INCREF(__pyx_t_8); __pyx_t_24 = 0;
       __pyx_t_13 = NULL;
     } else {
-      __pyx_t_24 = -1; __pyx_t_8 = PyObject_GetIter(PyList_GET_ITEM(__pyx_v_query, __pyx_v_i)); if (unlikely(!__pyx_t_8)) __PYX_ERR(0, 147, __pyx_L1_error)
+      __pyx_t_24 = -1; __pyx_t_8 = PyObject_GetIter(PyList_GET_ITEM(__pyx_v_query, __pyx_v_i)); if (unlikely(!__pyx_t_8)) __PYX_ERR(0, 152, __pyx_L1_error)
       __Pyx_GOTREF(__pyx_t_8);
-      __pyx_t_13 = Py_TYPE(__pyx_t_8)->tp_iternext; if (unlikely(!__pyx_t_13)) __PYX_ERR(0, 147, __pyx_L1_error)
+      __pyx_t_13 = Py_TYPE(__pyx_t_8)->tp_iternext; if (unlikely(!__pyx_t_13)) __PYX_ERR(0, 152, __pyx_L1_error)
     }
     for (;;) {
       if (likely(!__pyx_t_13)) {
         if (likely(PyList_CheckExact(__pyx_t_8))) {
           if (__pyx_t_24 >= PyList_GET_SIZE(__pyx_t_8)) break;
           #if CYTHON_ASSUME_SAFE_MACROS && !CYTHON_AVOID_BORROWED_REFS
-          __pyx_t_14 = PyList_GET_ITEM(__pyx_t_8, __pyx_t_24); __Pyx_INCREF(__pyx_t_14); __pyx_t_24++; if (unlikely(0 < 0)) __PYX_ERR(0, 147, __pyx_L1_error)
+          __pyx_t_14 = PyList_GET_ITEM(__pyx_t_8, __pyx_t_24); __Pyx_INCREF(__pyx_t_14); __pyx_t_24++; if (unlikely(0 < 0)) __PYX_ERR(0, 152, __pyx_L1_error)
           #else
-          __pyx_t_14 = PySequence_ITEM(__pyx_t_8, __pyx_t_24); __pyx_t_24++; if (unlikely(!__pyx_t_14)) __PYX_ERR(0, 147, __pyx_L1_error)
+          __pyx_t_14 = PySequence_ITEM(__pyx_t_8, __pyx_t_24); __pyx_t_24++; if (unlikely(!__pyx_t_14)) __PYX_ERR(0, 152, __pyx_L1_error)
           __Pyx_GOTREF(__pyx_t_14);
           #endif
         } else {
           if (__pyx_t_24 >= PyTuple_GET_SIZE(__pyx_t_8)) break;
           #if CYTHON_ASSUME_SAFE_MACROS && !CYTHON_AVOID_BORROWED_REFS
-          __pyx_t_14 = PyTuple_GET_ITEM(__pyx_t_8, __pyx_t_24); __Pyx_INCREF(__pyx_t_14); __pyx_t_24++; if (unlikely(0 < 0)) __PYX_ERR(0, 147, __pyx_L1_error)
+          __pyx_t_14 = PyTuple_GET_ITEM(__pyx_t_8, __pyx_t_24); __Pyx_INCREF(__pyx_t_14); __pyx_t_24++; if (unlikely(0 < 0)) __PYX_ERR(0, 152, __pyx_L1_error)
           #else
-          __pyx_t_14 = PySequence_ITEM(__pyx_t_8, __pyx_t_24); __pyx_t_24++; if (unlikely(!__pyx_t_14)) __PYX_ERR(0, 147, __pyx_L1_error)
+          __pyx_t_14 = PySequence_ITEM(__pyx_t_8, __pyx_t_24); __pyx_t_24++; if (unlikely(!__pyx_t_14)) __PYX_ERR(0, 152, __pyx_L1_error)
           __Pyx_GOTREF(__pyx_t_14);
           #endif
         }
@@ -4512,17 +4596,17 @@ static PyObject *__pyx_pf_15flake_detection_12find_circles_4merge_centers(CYTHON
           PyObject* exc_type = PyErr_Occurred();
           if (exc_type) {
             if (likely(__Pyx_PyErr_GivenExceptionMatches(exc_type, PyExc_StopIteration))) PyErr_Clear();
-            else __PYX_ERR(0, 147, __pyx_L1_error)
+            else __PYX_ERR(0, 152, __pyx_L1_error)
           }
           break;
         }
         __Pyx_GOTREF(__pyx_t_14);
       }
-      __pyx_t_20 = __Pyx_PyInt_As_int(__pyx_t_14); if (unlikely((__pyx_t_20 == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 147, __pyx_L1_error)
+      __pyx_t_20 = __Pyx_PyInt_As_int(__pyx_t_14); if (unlikely((__pyx_t_20 == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 152, __pyx_L1_error)
       __Pyx_DECREF(__pyx_t_14); __pyx_t_14 = 0;
       __pyx_v_j = __pyx_t_20;
 
-      /* "flake_detection/find_circles.pyx":148
+      /* "flake_detection/find_circles.pyx":153
  *         start_pos = data[i]
  *         for j in query[i]:
  *             if j == i:             # <<<<<<<<<<<<<<
@@ -4532,7 +4616,7 @@ static PyObject *__pyx_pf_15flake_detection_12find_circles_4merge_centers(CYTHON
       __pyx_t_4 = ((__pyx_v_j == __pyx_v_i) != 0);
       if (__pyx_t_4) {
 
-        /* "flake_detection/find_circles.pyx":149
+        /* "flake_detection/find_circles.pyx":154
  *         for j in query[i]:
  *             if j == i:
  *                 continue             # <<<<<<<<<<<<<<
@@ -4541,7 +4625,7 @@ static PyObject *__pyx_pf_15flake_detection_12find_circles_4merge_centers(CYTHON
  */
         goto __pyx_L10_continue;
 
-        /* "flake_detection/find_circles.pyx":148
+        /* "flake_detection/find_circles.pyx":153
  *         start_pos = data[i]
  *         for j in query[i]:
  *             if j == i:             # <<<<<<<<<<<<<<
@@ -4550,7 +4634,7 @@ static PyObject *__pyx_pf_15flake_detection_12find_circles_4merge_centers(CYTHON
  */
       }
 
-      /* "flake_detection/find_circles.pyx":151
+      /* "flake_detection/find_circles.pyx":156
  *                 continue
  *             # check if already profiled
  *             if j < i:             # <<<<<<<<<<<<<<
@@ -4560,7 +4644,7 @@ static PyObject *__pyx_pf_15flake_detection_12find_circles_4merge_centers(CYTHON
       __pyx_t_4 = ((__pyx_v_j < __pyx_v_i) != 0);
       if (__pyx_t_4) {
 
-        /* "flake_detection/find_circles.pyx":152
+        /* "flake_detection/find_circles.pyx":157
  *             # check if already profiled
  *             if j < i:
  *                 flag = False             # <<<<<<<<<<<<<<
@@ -4569,7 +4653,7 @@ static PyObject *__pyx_pf_15flake_detection_12find_circles_4merge_centers(CYTHON
  */
         __pyx_v_flag = 0;
 
-        /* "flake_detection/find_circles.pyx":153
+        /* "flake_detection/find_circles.pyx":158
  *             if j < i:
  *                 flag = False
  *                 for t in conn[j]:             # <<<<<<<<<<<<<<
@@ -4584,7 +4668,7 @@ static PyObject *__pyx_pf_15flake_detection_12find_circles_4merge_centers(CYTHON
           ++__pyx_t_25;
           __pyx_v_t = __pyx_t_20;
 
-          /* "flake_detection/find_circles.pyx":154
+          /* "flake_detection/find_circles.pyx":159
  *                 flag = False
  *                 for t in conn[j]:
  *                     if t == i:             # <<<<<<<<<<<<<<
@@ -4594,7 +4678,7 @@ static PyObject *__pyx_pf_15flake_detection_12find_circles_4merge_centers(CYTHON
           __pyx_t_4 = ((__pyx_v_t == __pyx_v_i) != 0);
           if (__pyx_t_4) {
 
-            /* "flake_detection/find_circles.pyx":155
+            /* "flake_detection/find_circles.pyx":160
  *                 for t in conn[j]:
  *                     if t == i:
  *                         flag = True             # <<<<<<<<<<<<<<
@@ -4603,7 +4687,7 @@ static PyObject *__pyx_pf_15flake_detection_12find_circles_4merge_centers(CYTHON
  */
             __pyx_v_flag = 1;
 
-            /* "flake_detection/find_circles.pyx":156
+            /* "flake_detection/find_circles.pyx":161
  *                     if t == i:
  *                         flag = True
  *                         break             # <<<<<<<<<<<<<<
@@ -4612,7 +4696,7 @@ static PyObject *__pyx_pf_15flake_detection_12find_circles_4merge_centers(CYTHON
  */
             goto __pyx_L15_break;
 
-            /* "flake_detection/find_circles.pyx":154
+            /* "flake_detection/find_circles.pyx":159
  *                 flag = False
  *                 for t in conn[j]:
  *                     if t == i:             # <<<<<<<<<<<<<<
@@ -4621,7 +4705,7 @@ static PyObject *__pyx_pf_15flake_detection_12find_circles_4merge_centers(CYTHON
  */
           }
 
-          /* "flake_detection/find_circles.pyx":153
+          /* "flake_detection/find_circles.pyx":158
  *             if j < i:
  *                 flag = False
  *                 for t in conn[j]:             # <<<<<<<<<<<<<<
@@ -4631,7 +4715,7 @@ static PyObject *__pyx_pf_15flake_detection_12find_circles_4merge_centers(CYTHON
         }
         __pyx_L15_break:;
 
-        /* "flake_detection/find_circles.pyx":157
+        /* "flake_detection/find_circles.pyx":162
  *                         flag = True
  *                         break
  *                 if flag:             # <<<<<<<<<<<<<<
@@ -4641,7 +4725,7 @@ static PyObject *__pyx_pf_15flake_detection_12find_circles_4merge_centers(CYTHON
         __pyx_t_4 = (__pyx_v_flag != 0);
         if (__pyx_t_4) {
 
-          /* "flake_detection/find_circles.pyx":158
+          /* "flake_detection/find_circles.pyx":163
  *                         break
  *                 if flag:
  *                     conn[i].push_back(j)             # <<<<<<<<<<<<<<
@@ -4652,10 +4736,10 @@ static PyObject *__pyx_pf_15flake_detection_12find_circles_4merge_centers(CYTHON
             (__pyx_v_conn[__pyx_v_i]).push_back(__pyx_v_j);
           } catch(...) {
             __Pyx_CppExn2PyErr();
-            __PYX_ERR(0, 158, __pyx_L1_error)
+            __PYX_ERR(0, 163, __pyx_L1_error)
           }
 
-          /* "flake_detection/find_circles.pyx":157
+          /* "flake_detection/find_circles.pyx":162
  *                         flag = True
  *                         break
  *                 if flag:             # <<<<<<<<<<<<<<
@@ -4664,7 +4748,7 @@ static PyObject *__pyx_pf_15flake_detection_12find_circles_4merge_centers(CYTHON
  */
         }
 
-        /* "flake_detection/find_circles.pyx":159
+        /* "flake_detection/find_circles.pyx":164
  *                 if flag:
  *                     conn[i].push_back(j)
  *                 continue             # <<<<<<<<<<<<<<
@@ -4673,7 +4757,7 @@ static PyObject *__pyx_pf_15flake_detection_12find_circles_4merge_centers(CYTHON
  */
         goto __pyx_L10_continue;
 
-        /* "flake_detection/find_circles.pyx":151
+        /* "flake_detection/find_circles.pyx":156
  *                 continue
  *             # check if already profiled
  *             if j < i:             # <<<<<<<<<<<<<<
@@ -4682,16 +4766,16 @@ static PyObject *__pyx_pf_15flake_detection_12find_circles_4merge_centers(CYTHON
  */
       }
 
-      /* "flake_detection/find_circles.pyx":160
+      /* "flake_detection/find_circles.pyx":165
  *                     conn[i].push_back(j)
  *                 continue
  *             end_pos = data[j]             # <<<<<<<<<<<<<<
  *             k = end_pos - start_pos
  *             pos = start_pos.copy()
  */
-      __pyx_t_14 = __Pyx_GetItemInt(((PyObject *)__pyx_v_data), __pyx_v_j, int, 1, __Pyx_PyInt_From_int, 0, 0, 0); if (unlikely(!__pyx_t_14)) __PYX_ERR(0, 160, __pyx_L1_error)
+      __pyx_t_14 = __Pyx_GetItemInt(((PyObject *)__pyx_v_data), __pyx_v_j, int, 1, __Pyx_PyInt_From_int, 0, 0, 0); if (unlikely(!__pyx_t_14)) __PYX_ERR(0, 165, __pyx_L1_error)
       __Pyx_GOTREF(__pyx_t_14);
-      if (!(likely(((__pyx_t_14) == Py_None) || likely(__Pyx_TypeTest(__pyx_t_14, __pyx_ptype_5numpy_ndarray))))) __PYX_ERR(0, 160, __pyx_L1_error)
+      if (!(likely(((__pyx_t_14) == Py_None) || likely(__Pyx_TypeTest(__pyx_t_14, __pyx_ptype_5numpy_ndarray))))) __PYX_ERR(0, 165, __pyx_L1_error)
       __pyx_t_19 = ((PyArrayObject *)__pyx_t_14);
       {
         __Pyx_BufFmt_StackElem __pyx_stack[1];
@@ -4708,22 +4792,22 @@ static PyObject *__pyx_pf_15flake_detection_12find_circles_4merge_centers(CYTHON
           __pyx_t_23 = __pyx_t_22 = __pyx_t_21 = 0;
         }
         __pyx_pybuffernd_end_pos.diminfo[0].strides = __pyx_pybuffernd_end_pos.rcbuffer->pybuffer.strides[0]; __pyx_pybuffernd_end_pos.diminfo[0].shape = __pyx_pybuffernd_end_pos.rcbuffer->pybuffer.shape[0];
-        if (unlikely(__pyx_t_20 < 0)) __PYX_ERR(0, 160, __pyx_L1_error)
+        if (unlikely(__pyx_t_20 < 0)) __PYX_ERR(0, 165, __pyx_L1_error)
       }
       __pyx_t_19 = 0;
       __Pyx_XDECREF_SET(__pyx_v_end_pos, ((PyArrayObject *)__pyx_t_14));
       __pyx_t_14 = 0;
 
-      /* "flake_detection/find_circles.pyx":161
+      /* "flake_detection/find_circles.pyx":166
  *                 continue
  *             end_pos = data[j]
  *             k = end_pos - start_pos             # <<<<<<<<<<<<<<
  *             pos = start_pos.copy()
  *             tpos = pos - start_pos
  */
-      __pyx_t_14 = PyNumber_Subtract(((PyObject *)__pyx_v_end_pos), ((PyObject *)__pyx_v_start_pos)); if (unlikely(!__pyx_t_14)) __PYX_ERR(0, 161, __pyx_L1_error)
+      __pyx_t_14 = PyNumber_Subtract(((PyObject *)__pyx_v_end_pos), ((PyObject *)__pyx_v_start_pos)); if (unlikely(!__pyx_t_14)) __PYX_ERR(0, 166, __pyx_L1_error)
       __Pyx_GOTREF(__pyx_t_14);
-      if (!(likely(((__pyx_t_14) == Py_None) || likely(__Pyx_TypeTest(__pyx_t_14, __pyx_ptype_5numpy_ndarray))))) __PYX_ERR(0, 161, __pyx_L1_error)
+      if (!(likely(((__pyx_t_14) == Py_None) || likely(__Pyx_TypeTest(__pyx_t_14, __pyx_ptype_5numpy_ndarray))))) __PYX_ERR(0, 166, __pyx_L1_error)
       __pyx_t_19 = ((PyArrayObject *)__pyx_t_14);
       {
         __Pyx_BufFmt_StackElem __pyx_stack[1];
@@ -4740,20 +4824,20 @@ static PyObject *__pyx_pf_15flake_detection_12find_circles_4merge_centers(CYTHON
           __pyx_t_21 = __pyx_t_22 = __pyx_t_23 = 0;
         }
         __pyx_pybuffernd_k.diminfo[0].strides = __pyx_pybuffernd_k.rcbuffer->pybuffer.strides[0]; __pyx_pybuffernd_k.diminfo[0].shape = __pyx_pybuffernd_k.rcbuffer->pybuffer.shape[0];
-        if (unlikely(__pyx_t_20 < 0)) __PYX_ERR(0, 161, __pyx_L1_error)
+        if (unlikely(__pyx_t_20 < 0)) __PYX_ERR(0, 166, __pyx_L1_error)
       }
       __pyx_t_19 = 0;
       __Pyx_XDECREF_SET(__pyx_v_k, ((PyArrayObject *)__pyx_t_14));
       __pyx_t_14 = 0;
 
-      /* "flake_detection/find_circles.pyx":162
+      /* "flake_detection/find_circles.pyx":167
  *             end_pos = data[j]
  *             k = end_pos - start_pos
  *             pos = start_pos.copy()             # <<<<<<<<<<<<<<
  *             tpos = pos - start_pos
  *             sy = 1 if k[0] > 0 else -1
  */
-      __pyx_t_5 = __Pyx_PyObject_GetAttrStr(((PyObject *)__pyx_v_start_pos), __pyx_n_s_copy); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 162, __pyx_L1_error)
+      __pyx_t_5 = __Pyx_PyObject_GetAttrStr(((PyObject *)__pyx_v_start_pos), __pyx_n_s_copy); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 167, __pyx_L1_error)
       __Pyx_GOTREF(__pyx_t_5);
       __pyx_t_15 = NULL;
       if (CYTHON_UNPACK_METHODS && likely(PyMethod_Check(__pyx_t_5))) {
@@ -4767,10 +4851,10 @@ static PyObject *__pyx_pf_15flake_detection_12find_circles_4merge_centers(CYTHON
       }
       __pyx_t_14 = (__pyx_t_15) ? __Pyx_PyObject_CallOneArg(__pyx_t_5, __pyx_t_15) : __Pyx_PyObject_CallNoArg(__pyx_t_5);
       __Pyx_XDECREF(__pyx_t_15); __pyx_t_15 = 0;
-      if (unlikely(!__pyx_t_14)) __PYX_ERR(0, 162, __pyx_L1_error)
+      if (unlikely(!__pyx_t_14)) __PYX_ERR(0, 167, __pyx_L1_error)
       __Pyx_GOTREF(__pyx_t_14);
       __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
-      if (!(likely(((__pyx_t_14) == Py_None) || likely(__Pyx_TypeTest(__pyx_t_14, __pyx_ptype_5numpy_ndarray))))) __PYX_ERR(0, 162, __pyx_L1_error)
+      if (!(likely(((__pyx_t_14) == Py_None) || likely(__Pyx_TypeTest(__pyx_t_14, __pyx_ptype_5numpy_ndarray))))) __PYX_ERR(0, 167, __pyx_L1_error)
       __pyx_t_19 = ((PyArrayObject *)__pyx_t_14);
       {
         __Pyx_BufFmt_StackElem __pyx_stack[1];
@@ -4787,22 +4871,22 @@ static PyObject *__pyx_pf_15flake_detection_12find_circles_4merge_centers(CYTHON
           __pyx_t_23 = __pyx_t_22 = __pyx_t_21 = 0;
         }
         __pyx_pybuffernd_pos.diminfo[0].strides = __pyx_pybuffernd_pos.rcbuffer->pybuffer.strides[0]; __pyx_pybuffernd_pos.diminfo[0].shape = __pyx_pybuffernd_pos.rcbuffer->pybuffer.shape[0];
-        if (unlikely(__pyx_t_20 < 0)) __PYX_ERR(0, 162, __pyx_L1_error)
+        if (unlikely(__pyx_t_20 < 0)) __PYX_ERR(0, 167, __pyx_L1_error)
       }
       __pyx_t_19 = 0;
       __Pyx_XDECREF_SET(__pyx_v_pos, ((PyArrayObject *)__pyx_t_14));
       __pyx_t_14 = 0;
 
-      /* "flake_detection/find_circles.pyx":163
+      /* "flake_detection/find_circles.pyx":168
  *             k = end_pos - start_pos
  *             pos = start_pos.copy()
  *             tpos = pos - start_pos             # <<<<<<<<<<<<<<
  *             sy = 1 if k[0] > 0 else -1
  *             sx = 1 if k[1] > 0 else -1
  */
-      __pyx_t_14 = PyNumber_Subtract(((PyObject *)__pyx_v_pos), ((PyObject *)__pyx_v_start_pos)); if (unlikely(!__pyx_t_14)) __PYX_ERR(0, 163, __pyx_L1_error)
+      __pyx_t_14 = PyNumber_Subtract(((PyObject *)__pyx_v_pos), ((PyObject *)__pyx_v_start_pos)); if (unlikely(!__pyx_t_14)) __PYX_ERR(0, 168, __pyx_L1_error)
       __Pyx_GOTREF(__pyx_t_14);
-      if (!(likely(((__pyx_t_14) == Py_None) || likely(__Pyx_TypeTest(__pyx_t_14, __pyx_ptype_5numpy_ndarray))))) __PYX_ERR(0, 163, __pyx_L1_error)
+      if (!(likely(((__pyx_t_14) == Py_None) || likely(__Pyx_TypeTest(__pyx_t_14, __pyx_ptype_5numpy_ndarray))))) __PYX_ERR(0, 168, __pyx_L1_error)
       __pyx_t_19 = ((PyArrayObject *)__pyx_t_14);
       {
         __Pyx_BufFmt_StackElem __pyx_stack[1];
@@ -4819,13 +4903,13 @@ static PyObject *__pyx_pf_15flake_detection_12find_circles_4merge_centers(CYTHON
           __pyx_t_21 = __pyx_t_22 = __pyx_t_23 = 0;
         }
         __pyx_pybuffernd_tpos.diminfo[0].strides = __pyx_pybuffernd_tpos.rcbuffer->pybuffer.strides[0]; __pyx_pybuffernd_tpos.diminfo[0].shape = __pyx_pybuffernd_tpos.rcbuffer->pybuffer.shape[0];
-        if (unlikely(__pyx_t_20 < 0)) __PYX_ERR(0, 163, __pyx_L1_error)
+        if (unlikely(__pyx_t_20 < 0)) __PYX_ERR(0, 168, __pyx_L1_error)
       }
       __pyx_t_19 = 0;
       __Pyx_XDECREF_SET(__pyx_v_tpos, ((PyArrayObject *)__pyx_t_14));
       __pyx_t_14 = 0;
 
-      /* "flake_detection/find_circles.pyx":164
+      /* "flake_detection/find_circles.pyx":169
  *             pos = start_pos.copy()
  *             tpos = pos - start_pos
  *             sy = 1 if k[0] > 0 else -1             # <<<<<<<<<<<<<<
@@ -4840,7 +4924,7 @@ static PyObject *__pyx_pf_15flake_detection_12find_circles_4merge_centers(CYTHON
       }
       __pyx_v_sy = __pyx_t_20;
 
-      /* "flake_detection/find_circles.pyx":165
+      /* "flake_detection/find_circles.pyx":170
  *             tpos = pos - start_pos
  *             sy = 1 if k[0] > 0 else -1
  *             sx = 1 if k[1] > 0 else -1             # <<<<<<<<<<<<<<
@@ -4855,7 +4939,7 @@ static PyObject *__pyx_pf_15flake_detection_12find_circles_4merge_centers(CYTHON
       }
       __pyx_v_sx = __pyx_t_20;
 
-      /* "flake_detection/find_circles.pyx":166
+      /* "flake_detection/find_circles.pyx":171
  *             sy = 1 if k[0] > 0 else -1
  *             sx = 1 if k[1] > 0 else -1
  *             vmax = vmin = img[end_pos[0], end_pos[1]]             # <<<<<<<<<<<<<<
@@ -4870,7 +4954,7 @@ static PyObject *__pyx_pf_15flake_detection_12find_circles_4merge_centers(CYTHON
       __pyx_v_vmax = __pyx_t_31;
       __pyx_v_vmin = __pyx_t_31;
 
-      /* "flake_detection/find_circles.pyx":168
+      /* "flake_detection/find_circles.pyx":173
  *             vmax = vmin = img[end_pos[0], end_pos[1]]
  *             # profiling
  *             while tpos[0] != k[0] and tpos[1] != k[1]:             # <<<<<<<<<<<<<<
@@ -4893,7 +4977,7 @@ static PyObject *__pyx_pf_15flake_detection_12find_circles_4merge_centers(CYTHON
         __pyx_L20_bool_binop_done:;
         if (!__pyx_t_4) break;
 
-        /* "flake_detection/find_circles.pyx":169
+        /* "flake_detection/find_circles.pyx":174
  *             # profiling
  *             while tpos[0] != k[0] and tpos[1] != k[1]:
  *                 t = img[pos[0], pos[1]]             # <<<<<<<<<<<<<<
@@ -4906,7 +4990,7 @@ static PyObject *__pyx_pf_15flake_detection_12find_circles_4merge_centers(CYTHON
         __pyx_t_29 = (*__Pyx_BufPtrStrided1d(__pyx_t_5numpy_int64_t *, __pyx_pybuffernd_pos.rcbuffer->pybuffer.buf, __pyx_t_27, __pyx_pybuffernd_pos.diminfo[0].strides));
         __pyx_v_t = (*__Pyx_BufPtrStrided2d(__pyx_t_5numpy_uint8_t *, __pyx_pybuffernd_img.rcbuffer->pybuffer.buf, __pyx_t_30, __pyx_pybuffernd_img.diminfo[0].strides, __pyx_t_29, __pyx_pybuffernd_img.diminfo[1].strides));
 
-        /* "flake_detection/find_circles.pyx":170
+        /* "flake_detection/find_circles.pyx":175
  *             while tpos[0] != k[0] and tpos[1] != k[1]:
  *                 t = img[pos[0], pos[1]]
  *                 if t > vmax:             # <<<<<<<<<<<<<<
@@ -4916,7 +5000,7 @@ static PyObject *__pyx_pf_15flake_detection_12find_circles_4merge_centers(CYTHON
         __pyx_t_4 = ((__pyx_v_t > __pyx_v_vmax) != 0);
         if (__pyx_t_4) {
 
-          /* "flake_detection/find_circles.pyx":171
+          /* "flake_detection/find_circles.pyx":176
  *                 t = img[pos[0], pos[1]]
  *                 if t > vmax:
  *                     vmax = t             # <<<<<<<<<<<<<<
@@ -4925,7 +5009,7 @@ static PyObject *__pyx_pf_15flake_detection_12find_circles_4merge_centers(CYTHON
  */
           __pyx_v_vmax = __pyx_v_t;
 
-          /* "flake_detection/find_circles.pyx":170
+          /* "flake_detection/find_circles.pyx":175
  *             while tpos[0] != k[0] and tpos[1] != k[1]:
  *                 t = img[pos[0], pos[1]]
  *                 if t > vmax:             # <<<<<<<<<<<<<<
@@ -4934,7 +5018,7 @@ static PyObject *__pyx_pf_15flake_detection_12find_circles_4merge_centers(CYTHON
  */
         }
 
-        /* "flake_detection/find_circles.pyx":172
+        /* "flake_detection/find_circles.pyx":177
  *                 if t > vmax:
  *                     vmax = t
  *                 if t < vmin:             # <<<<<<<<<<<<<<
@@ -4944,7 +5028,7 @@ static PyObject *__pyx_pf_15flake_detection_12find_circles_4merge_centers(CYTHON
         __pyx_t_4 = ((__pyx_v_t < __pyx_v_vmin) != 0);
         if (__pyx_t_4) {
 
-          /* "flake_detection/find_circles.pyx":173
+          /* "flake_detection/find_circles.pyx":178
  *                     vmax = t
  *                 if t < vmin:
  *                     vmin = t             # <<<<<<<<<<<<<<
@@ -4953,7 +5037,7 @@ static PyObject *__pyx_pf_15flake_detection_12find_circles_4merge_centers(CYTHON
  */
           __pyx_v_vmin = __pyx_v_t;
 
-          /* "flake_detection/find_circles.pyx":172
+          /* "flake_detection/find_circles.pyx":177
  *                 if t > vmax:
  *                     vmax = t
  *                 if t < vmin:             # <<<<<<<<<<<<<<
@@ -4962,7 +5046,7 @@ static PyObject *__pyx_pf_15flake_detection_12find_circles_4merge_centers(CYTHON
  */
         }
 
-        /* "flake_detection/find_circles.pyx":174
+        /* "flake_detection/find_circles.pyx":179
  *                 if t < vmin:
  *                     vmin = t
  *                 if abs(tpos[1] * k[0]) > abs(tpos[0] * k[1]):             # <<<<<<<<<<<<<<
@@ -4971,26 +5055,26 @@ static PyObject *__pyx_pf_15flake_detection_12find_circles_4merge_centers(CYTHON
  */
         __pyx_t_27 = 1;
         __pyx_t_28 = 0;
-        __pyx_t_14 = __Pyx_PyInt_From_npy_int64(((*__Pyx_BufPtrStrided1d(__pyx_t_5numpy_int64_t *, __pyx_pybuffernd_tpos.rcbuffer->pybuffer.buf, __pyx_t_27, __pyx_pybuffernd_tpos.diminfo[0].strides)) * (*__Pyx_BufPtrStrided1d(__pyx_t_5numpy_int64_t *, __pyx_pybuffernd_k.rcbuffer->pybuffer.buf, __pyx_t_28, __pyx_pybuffernd_k.diminfo[0].strides)))); if (unlikely(!__pyx_t_14)) __PYX_ERR(0, 174, __pyx_L1_error)
+        __pyx_t_14 = __Pyx_PyInt_From_npy_int64(((*__Pyx_BufPtrStrided1d(__pyx_t_5numpy_int64_t *, __pyx_pybuffernd_tpos.rcbuffer->pybuffer.buf, __pyx_t_27, __pyx_pybuffernd_tpos.diminfo[0].strides)) * (*__Pyx_BufPtrStrided1d(__pyx_t_5numpy_int64_t *, __pyx_pybuffernd_k.rcbuffer->pybuffer.buf, __pyx_t_28, __pyx_pybuffernd_k.diminfo[0].strides)))); if (unlikely(!__pyx_t_14)) __PYX_ERR(0, 179, __pyx_L1_error)
         __Pyx_GOTREF(__pyx_t_14);
-        __pyx_t_5 = __Pyx_PyNumber_Absolute(__pyx_t_14); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 174, __pyx_L1_error)
+        __pyx_t_5 = __Pyx_PyNumber_Absolute(__pyx_t_14); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 179, __pyx_L1_error)
         __Pyx_GOTREF(__pyx_t_5);
         __Pyx_DECREF(__pyx_t_14); __pyx_t_14 = 0;
         __pyx_t_28 = 0;
         __pyx_t_27 = 1;
-        __pyx_t_14 = __Pyx_PyInt_From_npy_int64(((*__Pyx_BufPtrStrided1d(__pyx_t_5numpy_int64_t *, __pyx_pybuffernd_tpos.rcbuffer->pybuffer.buf, __pyx_t_28, __pyx_pybuffernd_tpos.diminfo[0].strides)) * (*__Pyx_BufPtrStrided1d(__pyx_t_5numpy_int64_t *, __pyx_pybuffernd_k.rcbuffer->pybuffer.buf, __pyx_t_27, __pyx_pybuffernd_k.diminfo[0].strides)))); if (unlikely(!__pyx_t_14)) __PYX_ERR(0, 174, __pyx_L1_error)
+        __pyx_t_14 = __Pyx_PyInt_From_npy_int64(((*__Pyx_BufPtrStrided1d(__pyx_t_5numpy_int64_t *, __pyx_pybuffernd_tpos.rcbuffer->pybuffer.buf, __pyx_t_28, __pyx_pybuffernd_tpos.diminfo[0].strides)) * (*__Pyx_BufPtrStrided1d(__pyx_t_5numpy_int64_t *, __pyx_pybuffernd_k.rcbuffer->pybuffer.buf, __pyx_t_27, __pyx_pybuffernd_k.diminfo[0].strides)))); if (unlikely(!__pyx_t_14)) __PYX_ERR(0, 179, __pyx_L1_error)
         __Pyx_GOTREF(__pyx_t_14);
-        __pyx_t_15 = __Pyx_PyNumber_Absolute(__pyx_t_14); if (unlikely(!__pyx_t_15)) __PYX_ERR(0, 174, __pyx_L1_error)
+        __pyx_t_15 = __Pyx_PyNumber_Absolute(__pyx_t_14); if (unlikely(!__pyx_t_15)) __PYX_ERR(0, 179, __pyx_L1_error)
         __Pyx_GOTREF(__pyx_t_15);
         __Pyx_DECREF(__pyx_t_14); __pyx_t_14 = 0;
-        __pyx_t_14 = PyObject_RichCompare(__pyx_t_5, __pyx_t_15, Py_GT); __Pyx_XGOTREF(__pyx_t_14); if (unlikely(!__pyx_t_14)) __PYX_ERR(0, 174, __pyx_L1_error)
+        __pyx_t_14 = PyObject_RichCompare(__pyx_t_5, __pyx_t_15, Py_GT); __Pyx_XGOTREF(__pyx_t_14); if (unlikely(!__pyx_t_14)) __PYX_ERR(0, 179, __pyx_L1_error)
         __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
         __Pyx_DECREF(__pyx_t_15); __pyx_t_15 = 0;
-        __pyx_t_4 = __Pyx_PyObject_IsTrue(__pyx_t_14); if (unlikely(__pyx_t_4 < 0)) __PYX_ERR(0, 174, __pyx_L1_error)
+        __pyx_t_4 = __Pyx_PyObject_IsTrue(__pyx_t_14); if (unlikely(__pyx_t_4 < 0)) __PYX_ERR(0, 179, __pyx_L1_error)
         __Pyx_DECREF(__pyx_t_14); __pyx_t_14 = 0;
         if (__pyx_t_4) {
 
-          /* "flake_detection/find_circles.pyx":175
+          /* "flake_detection/find_circles.pyx":180
  *                     vmin = t
  *                 if abs(tpos[1] * k[0]) > abs(tpos[0] * k[1]):
  *                     pos[0] += sy             # <<<<<<<<<<<<<<
@@ -5000,7 +5084,7 @@ static PyObject *__pyx_pf_15flake_detection_12find_circles_4merge_centers(CYTHON
           __pyx_t_27 = 0;
           *__Pyx_BufPtrStrided1d(__pyx_t_5numpy_int64_t *, __pyx_pybuffernd_pos.rcbuffer->pybuffer.buf, __pyx_t_27, __pyx_pybuffernd_pos.diminfo[0].strides) += __pyx_v_sy;
 
-          /* "flake_detection/find_circles.pyx":174
+          /* "flake_detection/find_circles.pyx":179
  *                 if t < vmin:
  *                     vmin = t
  *                 if abs(tpos[1] * k[0]) > abs(tpos[0] * k[1]):             # <<<<<<<<<<<<<<
@@ -5010,7 +5094,7 @@ static PyObject *__pyx_pf_15flake_detection_12find_circles_4merge_centers(CYTHON
           goto __pyx_L24;
         }
 
-        /* "flake_detection/find_circles.pyx":177
+        /* "flake_detection/find_circles.pyx":182
  *                     pos[0] += sy
  *                 else:
  *                     pos[1] += sx             # <<<<<<<<<<<<<<
@@ -5023,16 +5107,16 @@ static PyObject *__pyx_pf_15flake_detection_12find_circles_4merge_centers(CYTHON
         }
         __pyx_L24:;
 
-        /* "flake_detection/find_circles.pyx":178
+        /* "flake_detection/find_circles.pyx":183
  *                 else:
  *                     pos[1] += sx
  *                 tpos = pos - start_pos             # <<<<<<<<<<<<<<
  *             if vmax - vmin < gap * vmax:
  *                 conn[i].push_back(j)
  */
-        __pyx_t_14 = PyNumber_Subtract(((PyObject *)__pyx_v_pos), ((PyObject *)__pyx_v_start_pos)); if (unlikely(!__pyx_t_14)) __PYX_ERR(0, 178, __pyx_L1_error)
+        __pyx_t_14 = PyNumber_Subtract(((PyObject *)__pyx_v_pos), ((PyObject *)__pyx_v_start_pos)); if (unlikely(!__pyx_t_14)) __PYX_ERR(0, 183, __pyx_L1_error)
         __Pyx_GOTREF(__pyx_t_14);
-        if (!(likely(((__pyx_t_14) == Py_None) || likely(__Pyx_TypeTest(__pyx_t_14, __pyx_ptype_5numpy_ndarray))))) __PYX_ERR(0, 178, __pyx_L1_error)
+        if (!(likely(((__pyx_t_14) == Py_None) || likely(__Pyx_TypeTest(__pyx_t_14, __pyx_ptype_5numpy_ndarray))))) __PYX_ERR(0, 183, __pyx_L1_error)
         __pyx_t_19 = ((PyArrayObject *)__pyx_t_14);
         {
           __Pyx_BufFmt_StackElem __pyx_stack[1];
@@ -5049,14 +5133,14 @@ static PyObject *__pyx_pf_15flake_detection_12find_circles_4merge_centers(CYTHON
             __pyx_t_23 = __pyx_t_22 = __pyx_t_21 = 0;
           }
           __pyx_pybuffernd_tpos.diminfo[0].strides = __pyx_pybuffernd_tpos.rcbuffer->pybuffer.strides[0]; __pyx_pybuffernd_tpos.diminfo[0].shape = __pyx_pybuffernd_tpos.rcbuffer->pybuffer.shape[0];
-          if (unlikely(__pyx_t_20 < 0)) __PYX_ERR(0, 178, __pyx_L1_error)
+          if (unlikely(__pyx_t_20 < 0)) __PYX_ERR(0, 183, __pyx_L1_error)
         }
         __pyx_t_19 = 0;
         __Pyx_DECREF_SET(__pyx_v_tpos, ((PyArrayObject *)__pyx_t_14));
         __pyx_t_14 = 0;
       }
 
-      /* "flake_detection/find_circles.pyx":179
+      /* "flake_detection/find_circles.pyx":184
  *                     pos[1] += sx
  *                 tpos = pos - start_pos
  *             if vmax - vmin < gap * vmax:             # <<<<<<<<<<<<<<
@@ -5066,7 +5150,7 @@ static PyObject *__pyx_pf_15flake_detection_12find_circles_4merge_centers(CYTHON
       __pyx_t_4 = (((__pyx_v_vmax - __pyx_v_vmin) < (__pyx_v_gap * __pyx_v_vmax)) != 0);
       if (__pyx_t_4) {
 
-        /* "flake_detection/find_circles.pyx":180
+        /* "flake_detection/find_circles.pyx":185
  *                 tpos = pos - start_pos
  *             if vmax - vmin < gap * vmax:
  *                 conn[i].push_back(j)             # <<<<<<<<<<<<<<
@@ -5077,10 +5161,10 @@ static PyObject *__pyx_pf_15flake_detection_12find_circles_4merge_centers(CYTHON
           (__pyx_v_conn[__pyx_v_i]).push_back(__pyx_v_j);
         } catch(...) {
           __Pyx_CppExn2PyErr();
-          __PYX_ERR(0, 180, __pyx_L1_error)
+          __PYX_ERR(0, 185, __pyx_L1_error)
         }
 
-        /* "flake_detection/find_circles.pyx":179
+        /* "flake_detection/find_circles.pyx":184
  *                     pos[1] += sx
  *                 tpos = pos - start_pos
  *             if vmax - vmin < gap * vmax:             # <<<<<<<<<<<<<<
@@ -5089,7 +5173,7 @@ static PyObject *__pyx_pf_15flake_detection_12find_circles_4merge_centers(CYTHON
  */
       }
 
-      /* "flake_detection/find_circles.pyx":147
+      /* "flake_detection/find_circles.pyx":152
  *     for i in range(len(query)):
  *         start_pos = data[i]
  *         for j in query[i]:             # <<<<<<<<<<<<<<
@@ -5101,7 +5185,7 @@ static PyObject *__pyx_pf_15flake_detection_12find_circles_4merge_centers(CYTHON
     __Pyx_DECREF(__pyx_t_8); __pyx_t_8 = 0;
   }
 
-  /* "flake_detection/find_circles.pyx":182
+  /* "flake_detection/find_circles.pyx":187
  *                 conn[i].push_back(j)
  *     # connect
  *     for i in range(tot_cand):             # <<<<<<<<<<<<<<
@@ -5113,7 +5197,7 @@ static PyObject *__pyx_pf_15flake_detection_12find_circles_4merge_centers(CYTHON
   for (__pyx_t_32 = 0; __pyx_t_32 < __pyx_t_20; __pyx_t_32+=1) {
     __pyx_v_i = __pyx_t_32;
 
-    /* "flake_detection/find_circles.pyx":183
+    /* "flake_detection/find_circles.pyx":188
  *     # connect
  *     for i in range(tot_cand):
  *         if flags[i]:             # <<<<<<<<<<<<<<
@@ -5123,7 +5207,7 @@ static PyObject *__pyx_pf_15flake_detection_12find_circles_4merge_centers(CYTHON
     __pyx_t_4 = ((__pyx_v_flags[__pyx_v_i]) != 0);
     if (__pyx_t_4) {
 
-      /* "flake_detection/find_circles.pyx":184
+      /* "flake_detection/find_circles.pyx":189
  *     for i in range(tot_cand):
  *         if flags[i]:
  *             continue             # <<<<<<<<<<<<<<
@@ -5132,7 +5216,7 @@ static PyObject *__pyx_pf_15flake_detection_12find_circles_4merge_centers(CYTHON
  */
       goto __pyx_L26_continue;
 
-      /* "flake_detection/find_circles.pyx":183
+      /* "flake_detection/find_circles.pyx":188
  *     # connect
  *     for i in range(tot_cand):
  *         if flags[i]:             # <<<<<<<<<<<<<<
@@ -5141,25 +5225,25 @@ static PyObject *__pyx_pf_15flake_detection_12find_circles_4merge_centers(CYTHON
  */
     }
 
-    /* "flake_detection/find_circles.pyx":185
+    /* "flake_detection/find_circles.pyx":190
  *         if flags[i]:
  *             continue
  *         current_node = [i]             # <<<<<<<<<<<<<<
  *         sy = 0
  *         sx = 0
  */
-    __pyx_t_8 = __Pyx_PyInt_From_int(__pyx_v_i); if (unlikely(!__pyx_t_8)) __PYX_ERR(0, 185, __pyx_L1_error)
+    __pyx_t_8 = __Pyx_PyInt_From_int(__pyx_v_i); if (unlikely(!__pyx_t_8)) __PYX_ERR(0, 190, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_8);
-    __pyx_t_14 = PyList_New(1); if (unlikely(!__pyx_t_14)) __PYX_ERR(0, 185, __pyx_L1_error)
+    __pyx_t_14 = PyList_New(1); if (unlikely(!__pyx_t_14)) __PYX_ERR(0, 190, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_14);
     __Pyx_GIVEREF(__pyx_t_8);
     PyList_SET_ITEM(__pyx_t_14, 0, __pyx_t_8);
     __pyx_t_8 = 0;
-    __pyx_t_33 = __pyx_convert_vector_from_py_int(__pyx_t_14); if (unlikely(PyErr_Occurred())) __PYX_ERR(0, 185, __pyx_L1_error)
+    __pyx_t_33 = __pyx_convert_vector_from_py_int(__pyx_t_14); if (unlikely(PyErr_Occurred())) __PYX_ERR(0, 190, __pyx_L1_error)
     __Pyx_DECREF(__pyx_t_14); __pyx_t_14 = 0;
     __pyx_v_current_node = __pyx_t_33;
 
-    /* "flake_detection/find_circles.pyx":186
+    /* "flake_detection/find_circles.pyx":191
  *             continue
  *         current_node = [i]
  *         sy = 0             # <<<<<<<<<<<<<<
@@ -5168,7 +5252,7 @@ static PyObject *__pyx_pf_15flake_detection_12find_circles_4merge_centers(CYTHON
  */
     __pyx_v_sy = 0;
 
-    /* "flake_detection/find_circles.pyx":187
+    /* "flake_detection/find_circles.pyx":192
  *         current_node = [i]
  *         sy = 0
  *         sx = 0             # <<<<<<<<<<<<<<
@@ -5177,7 +5261,7 @@ static PyObject *__pyx_pf_15flake_detection_12find_circles_4merge_centers(CYTHON
  */
     __pyx_v_sx = 0;
 
-    /* "flake_detection/find_circles.pyx":188
+    /* "flake_detection/find_circles.pyx":193
  *         sy = 0
  *         sx = 0
  *         que.push(i)             # <<<<<<<<<<<<<<
@@ -5186,7 +5270,7 @@ static PyObject *__pyx_pf_15flake_detection_12find_circles_4merge_centers(CYTHON
  */
     __pyx_v_que.push(__pyx_v_i);
 
-    /* "flake_detection/find_circles.pyx":189
+    /* "flake_detection/find_circles.pyx":194
  *         sx = 0
  *         que.push(i)
  *         flags[i] = True             # <<<<<<<<<<<<<<
@@ -5195,7 +5279,7 @@ static PyObject *__pyx_pf_15flake_detection_12find_circles_4merge_centers(CYTHON
  */
     (__pyx_v_flags[__pyx_v_i]) = 1;
 
-    /* "flake_detection/find_circles.pyx":190
+    /* "flake_detection/find_circles.pyx":195
  *         que.push(i)
  *         flags[i] = True
  *         while not que.empty():             # <<<<<<<<<<<<<<
@@ -5206,7 +5290,7 @@ static PyObject *__pyx_pf_15flake_detection_12find_circles_4merge_centers(CYTHON
       __pyx_t_4 = ((!(__pyx_v_que.empty() != 0)) != 0);
       if (!__pyx_t_4) break;
 
-      /* "flake_detection/find_circles.pyx":191
+      /* "flake_detection/find_circles.pyx":196
  *         flags[i] = True
  *         while not que.empty():
  *             for j in conn[que.front()]:             # <<<<<<<<<<<<<<
@@ -5221,7 +5305,7 @@ static PyObject *__pyx_pf_15flake_detection_12find_circles_4merge_centers(CYTHON
         ++__pyx_t_25;
         __pyx_v_j = __pyx_t_34;
 
-        /* "flake_detection/find_circles.pyx":192
+        /* "flake_detection/find_circles.pyx":197
  *         while not que.empty():
  *             for j in conn[que.front()]:
  *                 if not flags[j]:             # <<<<<<<<<<<<<<
@@ -5231,7 +5315,7 @@ static PyObject *__pyx_pf_15flake_detection_12find_circles_4merge_centers(CYTHON
         __pyx_t_4 = ((!((__pyx_v_flags[__pyx_v_j]) != 0)) != 0);
         if (__pyx_t_4) {
 
-          /* "flake_detection/find_circles.pyx":193
+          /* "flake_detection/find_circles.pyx":198
  *             for j in conn[que.front()]:
  *                 if not flags[j]:
  *                     current_node.push_back(j)             # <<<<<<<<<<<<<<
@@ -5242,10 +5326,10 @@ static PyObject *__pyx_pf_15flake_detection_12find_circles_4merge_centers(CYTHON
             __pyx_v_current_node.push_back(__pyx_v_j);
           } catch(...) {
             __Pyx_CppExn2PyErr();
-            __PYX_ERR(0, 193, __pyx_L1_error)
+            __PYX_ERR(0, 198, __pyx_L1_error)
           }
 
-          /* "flake_detection/find_circles.pyx":194
+          /* "flake_detection/find_circles.pyx":199
  *                 if not flags[j]:
  *                     current_node.push_back(j)
  *                     que.push(j)             # <<<<<<<<<<<<<<
@@ -5254,7 +5338,7 @@ static PyObject *__pyx_pf_15flake_detection_12find_circles_4merge_centers(CYTHON
  */
           __pyx_v_que.push(__pyx_v_j);
 
-          /* "flake_detection/find_circles.pyx":195
+          /* "flake_detection/find_circles.pyx":200
  *                     current_node.push_back(j)
  *                     que.push(j)
  *                     flags[j] = True             # <<<<<<<<<<<<<<
@@ -5263,7 +5347,7 @@ static PyObject *__pyx_pf_15flake_detection_12find_circles_4merge_centers(CYTHON
  */
           (__pyx_v_flags[__pyx_v_j]) = 1;
 
-          /* "flake_detection/find_circles.pyx":192
+          /* "flake_detection/find_circles.pyx":197
  *         while not que.empty():
  *             for j in conn[que.front()]:
  *                 if not flags[j]:             # <<<<<<<<<<<<<<
@@ -5272,7 +5356,7 @@ static PyObject *__pyx_pf_15flake_detection_12find_circles_4merge_centers(CYTHON
  */
         }
 
-        /* "flake_detection/find_circles.pyx":191
+        /* "flake_detection/find_circles.pyx":196
  *         flags[i] = True
  *         while not que.empty():
  *             for j in conn[que.front()]:             # <<<<<<<<<<<<<<
@@ -5281,7 +5365,7 @@ static PyObject *__pyx_pf_15flake_detection_12find_circles_4merge_centers(CYTHON
  */
       }
 
-      /* "flake_detection/find_circles.pyx":196
+      /* "flake_detection/find_circles.pyx":201
  *                     que.push(j)
  *                     flags[j] = True
  *             que.pop()             # <<<<<<<<<<<<<<
@@ -5291,7 +5375,7 @@ static PyObject *__pyx_pf_15flake_detection_12find_circles_4merge_centers(CYTHON
       __pyx_v_que.pop();
     }
 
-    /* "flake_detection/find_circles.pyx":197
+    /* "flake_detection/find_circles.pyx":202
  *                     flags[j] = True
  *             que.pop()
  *         for j in current_node:             # <<<<<<<<<<<<<<
@@ -5305,7 +5389,7 @@ static PyObject *__pyx_pf_15flake_detection_12find_circles_4merge_centers(CYTHON
       ++__pyx_t_25;
       __pyx_v_j = __pyx_t_34;
 
-      /* "flake_detection/find_circles.pyx":198
+      /* "flake_detection/find_circles.pyx":203
  *             que.pop()
  *         for j in current_node:
  *             sy += data[j, 0]             # <<<<<<<<<<<<<<
@@ -5316,7 +5400,7 @@ static PyObject *__pyx_pf_15flake_detection_12find_circles_4merge_centers(CYTHON
       __pyx_t_28 = 0;
       __pyx_v_sy = (__pyx_v_sy + (*__Pyx_BufPtrStrided2d(__pyx_t_5numpy_int64_t *, __pyx_pybuffernd_data.rcbuffer->pybuffer.buf, __pyx_t_27, __pyx_pybuffernd_data.diminfo[0].strides, __pyx_t_28, __pyx_pybuffernd_data.diminfo[1].strides)));
 
-      /* "flake_detection/find_circles.pyx":199
+      /* "flake_detection/find_circles.pyx":204
  *         for j in current_node:
  *             sy += data[j, 0]
  *             sx += data[j, 1]             # <<<<<<<<<<<<<<
@@ -5327,7 +5411,7 @@ static PyObject *__pyx_pf_15flake_detection_12find_circles_4merge_centers(CYTHON
       __pyx_t_27 = 1;
       __pyx_v_sx = (__pyx_v_sx + (*__Pyx_BufPtrStrided2d(__pyx_t_5numpy_int64_t *, __pyx_pybuffernd_data.rcbuffer->pybuffer.buf, __pyx_t_28, __pyx_pybuffernd_data.diminfo[0].strides, __pyx_t_27, __pyx_pybuffernd_data.diminfo[1].strides)));
 
-      /* "flake_detection/find_circles.pyx":197
+      /* "flake_detection/find_circles.pyx":202
  *                     flags[j] = True
  *             que.pop()
  *         for j in current_node:             # <<<<<<<<<<<<<<
@@ -5336,7 +5420,7 @@ static PyObject *__pyx_pf_15flake_detection_12find_circles_4merge_centers(CYTHON
  */
     }
 
-    /* "flake_detection/find_circles.pyx":200
+    /* "flake_detection/find_circles.pyx":205
  *             sy += data[j, 0]
  *             sx += data[j, 1]
  *         ans_y.push_back(sy / current_node.size())             # <<<<<<<<<<<<<<
@@ -5346,16 +5430,16 @@ static PyObject *__pyx_pf_15flake_detection_12find_circles_4merge_centers(CYTHON
     __pyx_t_35 = __pyx_v_current_node.size();
     if (unlikely(__pyx_t_35 == 0)) {
       PyErr_SetString(PyExc_ZeroDivisionError, "integer division or modulo by zero");
-      __PYX_ERR(0, 200, __pyx_L1_error)
+      __PYX_ERR(0, 205, __pyx_L1_error)
     }
     try {
       __pyx_v_ans_y.push_back((__pyx_v_sy / __pyx_t_35));
     } catch(...) {
       __Pyx_CppExn2PyErr();
-      __PYX_ERR(0, 200, __pyx_L1_error)
+      __PYX_ERR(0, 205, __pyx_L1_error)
     }
 
-    /* "flake_detection/find_circles.pyx":201
+    /* "flake_detection/find_circles.pyx":206
  *             sx += data[j, 1]
  *         ans_y.push_back(sy / current_node.size())
  *         ans_x.push_back(sx / current_node.size())             # <<<<<<<<<<<<<<
@@ -5365,29 +5449,29 @@ static PyObject *__pyx_pf_15flake_detection_12find_circles_4merge_centers(CYTHON
     __pyx_t_35 = __pyx_v_current_node.size();
     if (unlikely(__pyx_t_35 == 0)) {
       PyErr_SetString(PyExc_ZeroDivisionError, "integer division or modulo by zero");
-      __PYX_ERR(0, 201, __pyx_L1_error)
+      __PYX_ERR(0, 206, __pyx_L1_error)
     }
     try {
       __pyx_v_ans_x.push_back((__pyx_v_sx / __pyx_t_35));
     } catch(...) {
       __Pyx_CppExn2PyErr();
-      __PYX_ERR(0, 201, __pyx_L1_error)
+      __PYX_ERR(0, 206, __pyx_L1_error)
     }
     __pyx_L26_continue:;
   }
 
-  /* "flake_detection/find_circles.pyx":203
+  /* "flake_detection/find_circles.pyx":208
  *         ans_x.push_back(sx / current_node.size())
  * 
  *     return ans_y, ans_x             # <<<<<<<<<<<<<<
  * 
  */
   __Pyx_XDECREF(__pyx_r);
-  __pyx_t_14 = __pyx_convert_vector_to_py_int(__pyx_v_ans_y); if (unlikely(!__pyx_t_14)) __PYX_ERR(0, 203, __pyx_L1_error)
+  __pyx_t_14 = __pyx_convert_vector_to_py_int(__pyx_v_ans_y); if (unlikely(!__pyx_t_14)) __PYX_ERR(0, 208, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_14);
-  __pyx_t_8 = __pyx_convert_vector_to_py_int(__pyx_v_ans_x); if (unlikely(!__pyx_t_8)) __PYX_ERR(0, 203, __pyx_L1_error)
+  __pyx_t_8 = __pyx_convert_vector_to_py_int(__pyx_v_ans_x); if (unlikely(!__pyx_t_8)) __PYX_ERR(0, 208, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_8);
-  __pyx_t_15 = PyTuple_New(2); if (unlikely(!__pyx_t_15)) __PYX_ERR(0, 203, __pyx_L1_error)
+  __pyx_t_15 = PyTuple_New(2); if (unlikely(!__pyx_t_15)) __PYX_ERR(0, 208, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_15);
   __Pyx_GIVEREF(__pyx_t_14);
   PyTuple_SET_ITEM(__pyx_t_15, 0, __pyx_t_14);
@@ -5399,7 +5483,7 @@ static PyObject *__pyx_pf_15flake_detection_12find_circles_4merge_centers(CYTHON
   __pyx_t_15 = 0;
   goto __pyx_L0;
 
-  /* "flake_detection/find_circles.pyx":117
+  /* "flake_detection/find_circles.pyx":122
  * @cython.nonecheck(False)
  * 
  * def merge_centers(img_py, y_py, x_py, gap_py=0.9, merge_dist=50):             # <<<<<<<<<<<<<<
@@ -6596,71 +6680,6 @@ static std::vector<int>  __pyx_convert_vector_from_py_int(PyObject *__pyx_v_o) {
   return __pyx_r;
 }
 
-/* "vector.to_py":60
- * 
- * @cname("__pyx_convert_vector_to_py_int")
- * cdef object __pyx_convert_vector_to_py_int(vector[X]& v):             # <<<<<<<<<<<<<<
- *     return [v[i] for i in range(v.size())]
- * 
- */
-
-static PyObject *__pyx_convert_vector_to_py_int(const std::vector<int>  &__pyx_v_v) {
-  size_t __pyx_v_i;
-  PyObject *__pyx_r = NULL;
-  __Pyx_RefNannyDeclarations
-  PyObject *__pyx_t_1 = NULL;
-  size_t __pyx_t_2;
-  size_t __pyx_t_3;
-  size_t __pyx_t_4;
-  PyObject *__pyx_t_5 = NULL;
-  int __pyx_lineno = 0;
-  const char *__pyx_filename = NULL;
-  int __pyx_clineno = 0;
-  __Pyx_RefNannySetupContext("__pyx_convert_vector_to_py_int", 0);
-
-  /* "vector.to_py":61
- * @cname("__pyx_convert_vector_to_py_int")
- * cdef object __pyx_convert_vector_to_py_int(vector[X]& v):
- *     return [v[i] for i in range(v.size())]             # <<<<<<<<<<<<<<
- * 
- * 
- */
-  __Pyx_XDECREF(__pyx_r);
-  __pyx_t_1 = PyList_New(0); if (unlikely(!__pyx_t_1)) __PYX_ERR(2, 61, __pyx_L1_error)
-  __Pyx_GOTREF(__pyx_t_1);
-  __pyx_t_2 = __pyx_v_v.size();
-  __pyx_t_3 = __pyx_t_2;
-  for (__pyx_t_4 = 0; __pyx_t_4 < __pyx_t_3; __pyx_t_4+=1) {
-    __pyx_v_i = __pyx_t_4;
-    __pyx_t_5 = __Pyx_PyInt_From_int((__pyx_v_v[__pyx_v_i])); if (unlikely(!__pyx_t_5)) __PYX_ERR(2, 61, __pyx_L1_error)
-    __Pyx_GOTREF(__pyx_t_5);
-    if (unlikely(__Pyx_ListComp_Append(__pyx_t_1, (PyObject*)__pyx_t_5))) __PYX_ERR(2, 61, __pyx_L1_error)
-    __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
-  }
-  __pyx_r = __pyx_t_1;
-  __pyx_t_1 = 0;
-  goto __pyx_L0;
-
-  /* "vector.to_py":60
- * 
- * @cname("__pyx_convert_vector_to_py_int")
- * cdef object __pyx_convert_vector_to_py_int(vector[X]& v):             # <<<<<<<<<<<<<<
- *     return [v[i] for i in range(v.size())]
- * 
- */
-
-  /* function exit code */
-  __pyx_L1_error:;
-  __Pyx_XDECREF(__pyx_t_1);
-  __Pyx_XDECREF(__pyx_t_5);
-  __Pyx_AddTraceback("vector.to_py.__pyx_convert_vector_to_py_int", __pyx_clineno, __pyx_lineno, __pyx_filename);
-  __pyx_r = 0;
-  __pyx_L0:;
-  __Pyx_XGIVEREF(__pyx_r);
-  __Pyx_RefNannyFinishContext();
-  return __pyx_r;
-}
-
 /* "pair.from_py":145
  * 
  * @cname("__pyx_convert_pair_from_py_int__and_int")
@@ -6897,6 +6916,79 @@ static std::vector<std::pair<int,int> >  __pyx_convert_vector_from_py_std_3a__3a
   return __pyx_r;
 }
 
+/* "vector.to_py":60
+ * 
+ * @cname("__pyx_convert_vector_to_py_int")
+ * cdef object __pyx_convert_vector_to_py_int(vector[X]& v):             # <<<<<<<<<<<<<<
+ *     return [v[i] for i in range(v.size())]
+ * 
+ */
+
+static PyObject *__pyx_convert_vector_to_py_int(const std::vector<int>  &__pyx_v_v) {
+  size_t __pyx_v_i;
+  PyObject *__pyx_r = NULL;
+  __Pyx_RefNannyDeclarations
+  PyObject *__pyx_t_1 = NULL;
+  size_t __pyx_t_2;
+  size_t __pyx_t_3;
+  size_t __pyx_t_4;
+  PyObject *__pyx_t_5 = NULL;
+  int __pyx_lineno = 0;
+  const char *__pyx_filename = NULL;
+  int __pyx_clineno = 0;
+  __Pyx_RefNannySetupContext("__pyx_convert_vector_to_py_int", 0);
+
+  /* "vector.to_py":61
+ * @cname("__pyx_convert_vector_to_py_int")
+ * cdef object __pyx_convert_vector_to_py_int(vector[X]& v):
+ *     return [v[i] for i in range(v.size())]             # <<<<<<<<<<<<<<
+ * 
+ * 
+ */
+  __Pyx_XDECREF(__pyx_r);
+  __pyx_t_1 = PyList_New(0); if (unlikely(!__pyx_t_1)) __PYX_ERR(2, 61, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_1);
+  __pyx_t_2 = __pyx_v_v.size();
+  __pyx_t_3 = __pyx_t_2;
+  for (__pyx_t_4 = 0; __pyx_t_4 < __pyx_t_3; __pyx_t_4+=1) {
+    __pyx_v_i = __pyx_t_4;
+    __pyx_t_5 = __Pyx_PyInt_From_int((__pyx_v_v[__pyx_v_i])); if (unlikely(!__pyx_t_5)) __PYX_ERR(2, 61, __pyx_L1_error)
+    __Pyx_GOTREF(__pyx_t_5);
+    if (unlikely(__Pyx_ListComp_Append(__pyx_t_1, (PyObject*)__pyx_t_5))) __PYX_ERR(2, 61, __pyx_L1_error)
+    __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
+  }
+  __pyx_r = __pyx_t_1;
+  __pyx_t_1 = 0;
+  goto __pyx_L0;
+
+  /* "vector.to_py":60
+ * 
+ * @cname("__pyx_convert_vector_to_py_int")
+ * cdef object __pyx_convert_vector_to_py_int(vector[X]& v):             # <<<<<<<<<<<<<<
+ *     return [v[i] for i in range(v.size())]
+ * 
+ */
+
+  /* function exit code */
+  __pyx_L1_error:;
+  __Pyx_XDECREF(__pyx_t_1);
+  __Pyx_XDECREF(__pyx_t_5);
+  __Pyx_AddTraceback("vector.to_py.__pyx_convert_vector_to_py_int", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __pyx_r = 0;
+  __pyx_L0:;
+  __Pyx_XGIVEREF(__pyx_r);
+  __Pyx_RefNannyFinishContext();
+  return __pyx_r;
+}
+
+/* "vector.from_py":45
+ * 
+ * @cname("__pyx_convert_vector_from_py_std_3a__3a_vector_3c_int_3e___")
+ * cdef vector[X] __pyx_convert_vector_from_py_std_3a__3a_vector_3c_int_3e___(object o) except *:             # <<<<<<<<<<<<<<
+ *     cdef vector[X] v
+ *     for item in o:
+ */
+
 static std::vector<std::vector<int> >  __pyx_convert_vector_from_py_std_3a__3a_vector_3c_int_3e___(PyObject *__pyx_v_o) {
   std::vector<std::vector<int> >  __pyx_v_v;
   PyObject *__pyx_v_item = NULL;
@@ -7063,7 +7155,6 @@ static __Pyx_StringTabEntry __pyx_string_tab[] = {
   {&__pyx_n_s_ans_y, __pyx_k_ans_y, sizeof(__pyx_k_ans_y), 0, 0, 1, 1},
   {&__pyx_n_s_area, __pyx_k_area, sizeof(__pyx_k_area), 0, 0, 1, 1},
   {&__pyx_n_s_area_estimate, __pyx_k_area_estimate, sizeof(__pyx_k_area_estimate), 0, 0, 1, 1},
-  {&__pyx_n_s_argsort, __pyx_k_argsort, sizeof(__pyx_k_argsort), 0, 0, 1, 1},
   {&__pyx_n_s_bg, __pyx_k_bg, sizeof(__pyx_k_bg), 0, 0, 1, 1},
   {&__pyx_n_s_bg_th, __pyx_k_bg_th, sizeof(__pyx_k_bg_th), 0, 0, 1, 1},
   {&__pyx_n_s_bg_thr, __pyx_k_bg_thr, sizeof(__pyx_k_bg_thr), 0, 0, 1, 1},
@@ -7072,13 +7163,13 @@ static __Pyx_StringTabEntry __pyx_string_tab[] = {
   {&__pyx_n_s_conn, __pyx_k_conn, sizeof(__pyx_k_conn), 0, 0, 1, 1},
   {&__pyx_n_s_copy, __pyx_k_copy, sizeof(__pyx_k_copy), 0, 0, 1, 1},
   {&__pyx_n_s_cr, __pyx_k_cr, sizeof(__pyx_k_cr), 0, 0, 1, 1},
+  {&__pyx_n_s_crop, __pyx_k_crop, sizeof(__pyx_k_crop), 0, 0, 1, 1},
   {&__pyx_n_s_current_node, __pyx_k_current_node, sizeof(__pyx_k_current_node), 0, 0, 1, 1},
   {&__pyx_n_s_cutoff_ratio, __pyx_k_cutoff_ratio, sizeof(__pyx_k_cutoff_ratio), 0, 0, 1, 1},
   {&__pyx_n_s_cv2, __pyx_k_cv2, sizeof(__pyx_k_cv2), 0, 0, 1, 1},
   {&__pyx_n_s_d, __pyx_k_d, sizeof(__pyx_k_d), 0, 0, 1, 1},
   {&__pyx_n_s_data, __pyx_k_data, sizeof(__pyx_k_data), 0, 0, 1, 1},
   {&__pyx_n_s_dire, __pyx_k_dire, sizeof(__pyx_k_dire), 0, 0, 1, 1},
-  {&__pyx_n_s_disks, __pyx_k_disks, sizeof(__pyx_k_disks), 0, 0, 1, 1},
   {&__pyx_n_s_dtype, __pyx_k_dtype, sizeof(__pyx_k_dtype), 0, 0, 1, 1},
   {&__pyx_n_s_dx, __pyx_k_dx, sizeof(__pyx_k_dx), 0, 0, 1, 1},
   {&__pyx_n_s_dy, __pyx_k_dy, sizeof(__pyx_k_dy), 0, 0, 1, 1},
@@ -7087,6 +7178,8 @@ static __Pyx_StringTabEntry __pyx_string_tab[] = {
   {&__pyx_n_s_flags, __pyx_k_flags, sizeof(__pyx_k_flags), 0, 0, 1, 1},
   {&__pyx_n_s_flake_detection_find_circles, __pyx_k_flake_detection_find_circles, sizeof(__pyx_k_flake_detection_find_circles), 0, 0, 1, 1},
   {&__pyx_kp_s_flake_detection_find_circles_pyx, __pyx_k_flake_detection_find_circles_pyx, sizeof(__pyx_k_flake_detection_find_circles_pyx), 0, 0, 1, 0},
+  {&__pyx_n_s_flood, __pyx_k_flood, sizeof(__pyx_k_flood), 0, 0, 1, 1},
+  {&__pyx_n_s_floods, __pyx_k_floods, sizeof(__pyx_k_floods), 0, 0, 1, 1},
   {&__pyx_n_s_gap, __pyx_k_gap, sizeof(__pyx_k_gap), 0, 0, 1, 1},
   {&__pyx_n_s_gap_py, __pyx_k_gap_py, sizeof(__pyx_k_gap_py), 0, 0, 1, 1},
   {&__pyx_n_s_height, __pyx_k_height, sizeof(__pyx_k_height), 0, 0, 1, 1},
@@ -7106,7 +7199,6 @@ static __Pyx_StringTabEntry __pyx_string_tab[] = {
   {&__pyx_n_s_numpy, __pyx_k_numpy, sizeof(__pyx_k_numpy), 0, 0, 1, 1},
   {&__pyx_kp_s_numpy_core_multiarray_failed_to, __pyx_k_numpy_core_multiarray_failed_to, sizeof(__pyx_k_numpy_core_multiarray_failed_to), 0, 0, 1, 0},
   {&__pyx_kp_s_numpy_core_umath_failed_to_impor, __pyx_k_numpy_core_umath_failed_to_impor, sizeof(__pyx_k_numpy_core_umath_failed_to_impor), 0, 0, 1, 0},
-  {&__pyx_n_s_ones_like, __pyx_k_ones_like, sizeof(__pyx_k_ones_like), 0, 0, 1, 1},
   {&__pyx_n_s_pos, __pyx_k_pos, sizeof(__pyx_k_pos), 0, 0, 1, 1},
   {&__pyx_n_s_que, __pyx_k_que, sizeof(__pyx_k_que), 0, 0, 1, 1},
   {&__pyx_n_s_query, __pyx_k_query, sizeof(__pyx_k_query), 0, 0, 1, 1},
@@ -7116,6 +7208,7 @@ static __Pyx_StringTabEntry __pyx_string_tab[] = {
   {&__pyx_n_s_rad_py, __pyx_k_rad_py, sizeof(__pyx_k_rad_py), 0, 0, 1, 1},
   {&__pyx_n_s_radius_estimate, __pyx_k_radius_estimate, sizeof(__pyx_k_radius_estimate), 0, 0, 1, 1},
   {&__pyx_n_s_range, __pyx_k_range, sizeof(__pyx_k_range), 0, 0, 1, 1},
+  {&__pyx_n_s_se, __pyx_k_se, sizeof(__pyx_k_se), 0, 0, 1, 1},
   {&__pyx_n_s_shape, __pyx_k_shape, sizeof(__pyx_k_shape), 0, 0, 1, 1},
   {&__pyx_n_s_sklearn_neighbors, __pyx_k_sklearn_neighbors, sizeof(__pyx_k_sklearn_neighbors), 0, 0, 1, 1},
   {&__pyx_n_s_start_pos, __pyx_k_start_pos, sizeof(__pyx_k_start_pos), 0, 0, 1, 1},
@@ -7130,20 +7223,24 @@ static __Pyx_StringTabEntry __pyx_string_tab[] = {
   {&__pyx_n_s_transpose, __pyx_k_transpose, sizeof(__pyx_k_transpose), 0, 0, 1, 1},
   {&__pyx_n_s_tree, __pyx_k_tree, sizeof(__pyx_k_tree), 0, 0, 1, 1},
   {&__pyx_n_s_tt, __pyx_k_tt, sizeof(__pyx_k_tt), 0, 0, 1, 1},
-  {&__pyx_n_s_visited, __pyx_k_visited, sizeof(__pyx_k_visited), 0, 0, 1, 1},
   {&__pyx_n_s_vmax, __pyx_k_vmax, sizeof(__pyx_k_vmax), 0, 0, 1, 1},
   {&__pyx_n_s_vmin, __pyx_k_vmin, sizeof(__pyx_k_vmin), 0, 0, 1, 1},
   {&__pyx_n_s_width, __pyx_k_width, sizeof(__pyx_k_width), 0, 0, 1, 1},
   {&__pyx_n_s_x, __pyx_k_x, sizeof(__pyx_k_x), 0, 0, 1, 1},
   {&__pyx_n_s_x_py, __pyx_k_x_py, sizeof(__pyx_k_x_py), 0, 0, 1, 1},
+  {&__pyx_n_s_xe, __pyx_k_xe, sizeof(__pyx_k_xe), 0, 0, 1, 1},
+  {&__pyx_n_s_xs, __pyx_k_xs, sizeof(__pyx_k_xs), 0, 0, 1, 1},
   {&__pyx_n_s_y, __pyx_k_y, sizeof(__pyx_k_y), 0, 0, 1, 1},
   {&__pyx_n_s_y_py, __pyx_k_y_py, sizeof(__pyx_k_y_py), 0, 0, 1, 1},
+  {&__pyx_n_s_ye, __pyx_k_ye, sizeof(__pyx_k_ye), 0, 0, 1, 1},
+  {&__pyx_n_s_ys, __pyx_k_ys, sizeof(__pyx_k_ys), 0, 0, 1, 1},
+  {&__pyx_n_s_zeros_like, __pyx_k_zeros_like, sizeof(__pyx_k_zeros_like), 0, 0, 1, 1},
   {&__pyx_n_s_zip, __pyx_k_zip, sizeof(__pyx_k_zip), 0, 0, 1, 1},
   {0, 0, 0, 0, 0, 0, 0}
 };
 static CYTHON_SMALL_CODE int __Pyx_InitCachedBuiltins(void) {
   __pyx_builtin_range = __Pyx_GetBuiltinName(__pyx_n_s_range); if (!__pyx_builtin_range) __PYX_ERR(0, 34, __pyx_L1_error)
-  __pyx_builtin_zip = __Pyx_GetBuiltinName(__pyx_n_s_zip); if (!__pyx_builtin_zip) __PYX_ERR(0, 143, __pyx_L1_error)
+  __pyx_builtin_zip = __Pyx_GetBuiltinName(__pyx_n_s_zip); if (!__pyx_builtin_zip) __PYX_ERR(0, 148, __pyx_L1_error)
   __pyx_builtin_ImportError = __Pyx_GetBuiltinName(__pyx_n_s_ImportError); if (!__pyx_builtin_ImportError) __PYX_ERR(1, 944, __pyx_L1_error)
   return 0;
   __pyx_L1_error:;
@@ -7154,23 +7251,23 @@ static CYTHON_SMALL_CODE int __Pyx_InitCachedConstants(void) {
   __Pyx_RefNannyDeclarations
   __Pyx_RefNannySetupContext("__Pyx_InitCachedConstants", 0);
 
-  /* "flake_detection/find_circles.pyx":85
- *         np.ndarray[np.int32_t, ndim=2] disks = np.ones_like(img_py, dtype=int) * -1, visited = np.ones_like(img_py, dtype=int) * -1
+  /* "flake_detection/find_circles.pyx":84
+ *         np.ndarray[np.int32_t, ndim=2] flood
  *         vector[int] y = y_py, x = x_py, area = [1] * tot_cand, rad = rad_py
  *         vector[pair[int, int]] dire = [(1, 0), (-1, 0), (0, 1), (0, -1)]             # <<<<<<<<<<<<<<
  *         queue[pair[int, int]] que
  *         pair[int, int] t, tt
  */
-  __pyx_tuple_ = PyTuple_Pack(2, __pyx_int_1, __pyx_int_0); if (unlikely(!__pyx_tuple_)) __PYX_ERR(0, 85, __pyx_L1_error)
+  __pyx_tuple_ = PyTuple_Pack(2, __pyx_int_1, __pyx_int_0); if (unlikely(!__pyx_tuple_)) __PYX_ERR(0, 84, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_tuple_);
   __Pyx_GIVEREF(__pyx_tuple_);
-  __pyx_tuple__2 = PyTuple_Pack(2, __pyx_int_neg_1, __pyx_int_0); if (unlikely(!__pyx_tuple__2)) __PYX_ERR(0, 85, __pyx_L1_error)
+  __pyx_tuple__2 = PyTuple_Pack(2, __pyx_int_neg_1, __pyx_int_0); if (unlikely(!__pyx_tuple__2)) __PYX_ERR(0, 84, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_tuple__2);
   __Pyx_GIVEREF(__pyx_tuple__2);
-  __pyx_tuple__3 = PyTuple_Pack(2, __pyx_int_0, __pyx_int_1); if (unlikely(!__pyx_tuple__3)) __PYX_ERR(0, 85, __pyx_L1_error)
+  __pyx_tuple__3 = PyTuple_Pack(2, __pyx_int_0, __pyx_int_1); if (unlikely(!__pyx_tuple__3)) __PYX_ERR(0, 84, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_tuple__3);
   __Pyx_GIVEREF(__pyx_tuple__3);
-  __pyx_tuple__4 = PyTuple_Pack(2, __pyx_int_0, __pyx_int_neg_1); if (unlikely(!__pyx_tuple__4)) __PYX_ERR(0, 85, __pyx_L1_error)
+  __pyx_tuple__4 = PyTuple_Pack(2, __pyx_int_0, __pyx_int_neg_1); if (unlikely(!__pyx_tuple__4)) __PYX_ERR(0, 84, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_tuple__4);
   __Pyx_GIVEREF(__pyx_tuple__4);
 
@@ -7208,29 +7305,29 @@ static CYTHON_SMALL_CODE int __Pyx_InitCachedConstants(void) {
   __Pyx_GIVEREF(__pyx_tuple__7);
   __pyx_codeobj__8 = (PyObject*)__Pyx_PyCode_New(6, 0, 25, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__7, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_flake_detection_find_circles_pyx, __pyx_n_s_radius_estimate, 16, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__8)) __PYX_ERR(0, 16, __pyx_L1_error)
 
-  /* "flake_detection/find_circles.pyx":68
+  /* "flake_detection/find_circles.pyx":67
  * @cython.nonecheck(False)
  * 
  * def area_estimate(img_py, y_py, x_py, rad_py, cutoff_ratio=0.5, lowest_cutoff=0):             # <<<<<<<<<<<<<<
  *     """
  *     Count area by flooding, based on radius estimate results.
  */
-  __pyx_tuple__9 = PyTuple_Pack(27, __pyx_n_s_img_py, __pyx_n_s_y_py, __pyx_n_s_x_py, __pyx_n_s_rad_py, __pyx_n_s_cutoff_ratio, __pyx_n_s_lowest_cutoff, __pyx_n_s_tot_cand, __pyx_n_s_i, __pyx_n_s_j, __pyx_n_s_k, __pyx_n_s_width, __pyx_n_s_height, __pyx_n_s_cr, __pyx_n_s_thr, __pyx_n_s_lc, __pyx_n_s_img, __pyx_n_s_disks, __pyx_n_s_visited, __pyx_n_s_y, __pyx_n_s_x, __pyx_n_s_area, __pyx_n_s_rad, __pyx_n_s_dire, __pyx_n_s_que, __pyx_n_s_t, __pyx_n_s_tt, __pyx_n_s_d); if (unlikely(!__pyx_tuple__9)) __PYX_ERR(0, 68, __pyx_L1_error)
+  __pyx_tuple__9 = PyTuple_Pack(33, __pyx_n_s_img_py, __pyx_n_s_y_py, __pyx_n_s_x_py, __pyx_n_s_rad_py, __pyx_n_s_cutoff_ratio, __pyx_n_s_lowest_cutoff, __pyx_n_s_tot_cand, __pyx_n_s_i, __pyx_n_s_j, __pyx_n_s_k, __pyx_n_s_cr, __pyx_n_s_thr, __pyx_n_s_lc, __pyx_n_s_img, __pyx_n_s_flood, __pyx_n_s_y, __pyx_n_s_x, __pyx_n_s_area, __pyx_n_s_rad, __pyx_n_s_dire, __pyx_n_s_que, __pyx_n_s_t, __pyx_n_s_tt, __pyx_n_s_ys, __pyx_n_s_xs, __pyx_n_s_ye, __pyx_n_s_se, __pyx_n_s_height, __pyx_n_s_width, __pyx_n_s_floods, __pyx_n_s_xe, __pyx_n_s_crop, __pyx_n_s_d); if (unlikely(!__pyx_tuple__9)) __PYX_ERR(0, 67, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_tuple__9);
   __Pyx_GIVEREF(__pyx_tuple__9);
-  __pyx_codeobj__10 = (PyObject*)__Pyx_PyCode_New(6, 0, 27, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__9, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_flake_detection_find_circles_pyx, __pyx_n_s_area_estimate, 68, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__10)) __PYX_ERR(0, 68, __pyx_L1_error)
+  __pyx_codeobj__10 = (PyObject*)__Pyx_PyCode_New(6, 0, 33, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__9, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_flake_detection_find_circles_pyx, __pyx_n_s_area_estimate, 67, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__10)) __PYX_ERR(0, 67, __pyx_L1_error)
 
-  /* "flake_detection/find_circles.pyx":117
+  /* "flake_detection/find_circles.pyx":122
  * @cython.nonecheck(False)
  * 
  * def merge_centers(img_py, y_py, x_py, gap_py=0.9, merge_dist=50):             # <<<<<<<<<<<<<<
  *     """
  *     Merge centers if there's no major change in the profile between them.
  */
-  __pyx_tuple__11 = PyTuple_Pack(33, __pyx_n_s_img_py, __pyx_n_s_y_py, __pyx_n_s_x_py, __pyx_n_s_gap_py, __pyx_n_s_merge_dist, __pyx_n_s_tot_cand, __pyx_n_s_i, __pyx_n_s_j, __pyx_n_s_sy, __pyx_n_s_sx, __pyx_n_s_vmax, __pyx_n_s_vmin, __pyx_n_s_t, __pyx_n_s_gap, __pyx_n_s_img, __pyx_n_s_data, __pyx_n_s_conn, __pyx_n_s_flag, __pyx_n_s_start_pos, __pyx_n_s_end_pos, __pyx_n_s_k, __pyx_n_s_pos, __pyx_n_s_tpos, __pyx_n_s_flags, __pyx_n_s_ans_y, __pyx_n_s_ans_x, __pyx_n_s_current_node, __pyx_n_s_que, __pyx_n_s_tree, __pyx_n_s_query, __pyx_n_s_y, __pyx_n_s_x, __pyx_n_s_d); if (unlikely(!__pyx_tuple__11)) __PYX_ERR(0, 117, __pyx_L1_error)
+  __pyx_tuple__11 = PyTuple_Pack(33, __pyx_n_s_img_py, __pyx_n_s_y_py, __pyx_n_s_x_py, __pyx_n_s_gap_py, __pyx_n_s_merge_dist, __pyx_n_s_tot_cand, __pyx_n_s_i, __pyx_n_s_j, __pyx_n_s_sy, __pyx_n_s_sx, __pyx_n_s_vmax, __pyx_n_s_vmin, __pyx_n_s_t, __pyx_n_s_gap, __pyx_n_s_img, __pyx_n_s_data, __pyx_n_s_conn, __pyx_n_s_flag, __pyx_n_s_start_pos, __pyx_n_s_end_pos, __pyx_n_s_k, __pyx_n_s_pos, __pyx_n_s_tpos, __pyx_n_s_flags, __pyx_n_s_ans_y, __pyx_n_s_ans_x, __pyx_n_s_current_node, __pyx_n_s_que, __pyx_n_s_tree, __pyx_n_s_query, __pyx_n_s_y, __pyx_n_s_x, __pyx_n_s_d); if (unlikely(!__pyx_tuple__11)) __PYX_ERR(0, 122, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_tuple__11);
   __Pyx_GIVEREF(__pyx_tuple__11);
-  __pyx_codeobj__12 = (PyObject*)__Pyx_PyCode_New(5, 0, 33, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__11, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_flake_detection_find_circles_pyx, __pyx_n_s_merge_centers, 117, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__12)) __PYX_ERR(0, 117, __pyx_L1_error)
+  __pyx_codeobj__12 = (PyObject*)__Pyx_PyCode_New(5, 0, 33, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__11, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_flake_detection_find_circles_pyx, __pyx_n_s_merge_centers, 122, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__12)) __PYX_ERR(0, 122, __pyx_L1_error)
   __Pyx_RefNannyFinishContext();
   return 0;
   __pyx_L1_error:;
@@ -7626,28 +7723,28 @@ if (!__Pyx_RefNanny) {
   if (PyDict_SetItem(__pyx_d, __pyx_n_s_radius_estimate, __pyx_t_2) < 0) __PYX_ERR(0, 16, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
 
-  /* "flake_detection/find_circles.pyx":68
+  /* "flake_detection/find_circles.pyx":67
  * @cython.nonecheck(False)
  * 
  * def area_estimate(img_py, y_py, x_py, rad_py, cutoff_ratio=0.5, lowest_cutoff=0):             # <<<<<<<<<<<<<<
  *     """
  *     Count area by flooding, based on radius estimate results.
  */
-  __pyx_t_2 = PyCFunction_NewEx(&__pyx_mdef_15flake_detection_12find_circles_3area_estimate, NULL, __pyx_n_s_flake_detection_find_circles); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 68, __pyx_L1_error)
+  __pyx_t_2 = PyCFunction_NewEx(&__pyx_mdef_15flake_detection_12find_circles_3area_estimate, NULL, __pyx_n_s_flake_detection_find_circles); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 67, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_2);
-  if (PyDict_SetItem(__pyx_d, __pyx_n_s_area_estimate, __pyx_t_2) < 0) __PYX_ERR(0, 68, __pyx_L1_error)
+  if (PyDict_SetItem(__pyx_d, __pyx_n_s_area_estimate, __pyx_t_2) < 0) __PYX_ERR(0, 67, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
 
-  /* "flake_detection/find_circles.pyx":117
+  /* "flake_detection/find_circles.pyx":122
  * @cython.nonecheck(False)
  * 
  * def merge_centers(img_py, y_py, x_py, gap_py=0.9, merge_dist=50):             # <<<<<<<<<<<<<<
  *     """
  *     Merge centers if there's no major change in the profile between them.
  */
-  __pyx_t_2 = PyCFunction_NewEx(&__pyx_mdef_15flake_detection_12find_circles_5merge_centers, NULL, __pyx_n_s_flake_detection_find_circles); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 117, __pyx_L1_error)
+  __pyx_t_2 = PyCFunction_NewEx(&__pyx_mdef_15flake_detection_12find_circles_5merge_centers, NULL, __pyx_n_s_flake_detection_find_circles); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 122, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_2);
-  if (PyDict_SetItem(__pyx_d, __pyx_n_s_merge_centers, __pyx_t_2) < 0) __PYX_ERR(0, 117, __pyx_L1_error)
+  if (PyDict_SetItem(__pyx_d, __pyx_n_s_merge_centers, __pyx_t_2) < 0) __PYX_ERR(0, 122, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
 
   /* "flake_detection/find_circles.pyx":1
@@ -8565,6 +8662,35 @@ static CYTHON_INLINE void __Pyx_ErrFetchInState(PyThreadState *tstate, PyObject 
 }
 #endif
 
+/* ObjectGetItem */
+  #if CYTHON_USE_TYPE_SLOTS
+static PyObject *__Pyx_PyObject_GetIndex(PyObject *obj, PyObject* index) {
+    PyObject *runerr = NULL;
+    Py_ssize_t key_value;
+    PySequenceMethods *m = Py_TYPE(obj)->tp_as_sequence;
+    if (unlikely(!(m && m->sq_item))) {
+        PyErr_Format(PyExc_TypeError, "'%.200s' object is not subscriptable", Py_TYPE(obj)->tp_name);
+        return NULL;
+    }
+    key_value = __Pyx_PyIndex_AsSsize_t(index);
+    if (likely(key_value != -1 || !(runerr = PyErr_Occurred()))) {
+        return __Pyx_GetItemInt_Fast(obj, key_value, 0, 1, 1);
+    }
+    if (PyErr_GivenExceptionMatches(runerr, PyExc_OverflowError)) {
+        PyErr_Clear();
+        PyErr_Format(PyExc_IndexError, "cannot fit '%.200s' into an index-sized integer", Py_TYPE(index)->tp_name);
+    }
+    return NULL;
+}
+static PyObject *__Pyx_PyObject_GetItem(PyObject *obj, PyObject* key) {
+    PyMappingMethods *m = Py_TYPE(obj)->tp_as_mapping;
+    if (likely(m && m->mp_subscript)) {
+        return m->mp_subscript(obj, key);
+    }
+    return __Pyx_PyObject_GetIndex(obj, key);
+}
+#endif
+
 /* PyDictVersioning */
   #if CYTHON_USE_DICT_VERSIONS && CYTHON_USE_TYPE_SLOTS
 static CYTHON_INLINE PY_UINT64_T __Pyx_get_tp_dict_version(PyObject *obj) {
@@ -8645,6 +8771,12 @@ static CYTHON_INLINE PyObject* __Pyx_PyObject_Call(PyObject *func, PyObject *arg
     return result;
 }
 #endif
+
+/* BufferFallbackError */
+  static void __Pyx_RaiseBufferFallbackError(void) {
+  PyErr_SetString(PyExc_ValueError,
+     "Buffer acquisition failed on assignment; and then reacquiring the old buffer failed too!");
+}
 
 /* PyCFunctionFastCall */
   #if CYTHON_FAST_PYCCALL
@@ -8788,35 +8920,6 @@ done:
 #endif
 #endif
 
-/* PyObjectCall2Args */
-  static CYTHON_UNUSED PyObject* __Pyx_PyObject_Call2Args(PyObject* function, PyObject* arg1, PyObject* arg2) {
-    PyObject *args, *result = NULL;
-    #if CYTHON_FAST_PYCALL
-    if (PyFunction_Check(function)) {
-        PyObject *args[2] = {arg1, arg2};
-        return __Pyx_PyFunction_FastCall(function, args, 2);
-    }
-    #endif
-    #if CYTHON_FAST_PYCCALL
-    if (__Pyx_PyFastCFunction_Check(function)) {
-        PyObject *args[2] = {arg1, arg2};
-        return __Pyx_PyCFunction_FastCall(function, args, 2);
-    }
-    #endif
-    args = PyTuple_New(2);
-    if (unlikely(!args)) goto done;
-    Py_INCREF(arg1);
-    PyTuple_SET_ITEM(args, 0, arg1);
-    Py_INCREF(arg2);
-    PyTuple_SET_ITEM(args, 1, arg2);
-    Py_INCREF(function);
-    result = __Pyx_PyObject_Call(function, args, NULL);
-    Py_DECREF(args);
-    Py_DECREF(function);
-done:
-    return result;
-}
-
 /* PyObjectCallMethO */
   #if CYTHON_COMPILING_IN_CPYTHON
 static CYTHON_INLINE PyObject* __Pyx_PyObject_CallMethO(PyObject *func, PyObject *arg) {
@@ -8876,6 +8979,35 @@ static CYTHON_INLINE PyObject* __Pyx_PyObject_CallOneArg(PyObject *func, PyObjec
     return result;
 }
 #endif
+
+/* PyObjectCall2Args */
+  static CYTHON_UNUSED PyObject* __Pyx_PyObject_Call2Args(PyObject* function, PyObject* arg1, PyObject* arg2) {
+    PyObject *args, *result = NULL;
+    #if CYTHON_FAST_PYCALL
+    if (PyFunction_Check(function)) {
+        PyObject *args[2] = {arg1, arg2};
+        return __Pyx_PyFunction_FastCall(function, args, 2);
+    }
+    #endif
+    #if CYTHON_FAST_PYCCALL
+    if (__Pyx_PyFastCFunction_Check(function)) {
+        PyObject *args[2] = {arg1, arg2};
+        return __Pyx_PyCFunction_FastCall(function, args, 2);
+    }
+    #endif
+    args = PyTuple_New(2);
+    if (unlikely(!args)) goto done;
+    Py_INCREF(arg1);
+    PyTuple_SET_ITEM(args, 0, arg1);
+    Py_INCREF(arg2);
+    PyTuple_SET_ITEM(args, 1, arg2);
+    Py_INCREF(function);
+    result = __Pyx_PyObject_Call(function, args, NULL);
+    Py_DECREF(args);
+    Py_DECREF(function);
+done:
+    return result;
+}
 
 /* PyObjectCallNoArg */
   #if CYTHON_COMPILING_IN_CPYTHON
@@ -8955,12 +9087,6 @@ static CYTHON_INLINE PyObject* __Pyx_PyObject_CallNoArg(PyObject *func) {
         return -1;
     }
     return __Pyx_IterFinish();
-}
-
-/* BufferFallbackError */
-  static void __Pyx_RaiseBufferFallbackError(void) {
-  PyErr_SetString(PyExc_ValueError,
-     "Buffer acquisition failed on assignment; and then reacquiring the old buffer failed too!");
 }
 
 /* py_abs */

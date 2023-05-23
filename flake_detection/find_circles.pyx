@@ -57,8 +57,7 @@ def radius_estimate(img_py, y_py, x_py, cutoff_ratio=0.5, bg_thr=.001, lowest_cu
             else:
                 continue
             break
-    return rad
-
+    return [r * 1.2 for r in rad]
 
 
 @cython.boundscheck(False)
@@ -77,38 +76,44 @@ def area_estimate(img_py, y_py, x_py, rad_py, cutoff_ratio=0.5, lowest_cutoff=0)
     """
     assert len(x_py) == len(y_py) == len(rad_py)
     cdef:
-        int tot_cand = len(y_py), i, j, k, width = img_py.shape[1], height = img_py.shape[0]
+        int tot_cand = len(y_py), i, j, k
         float cr = cutoff_ratio, thr, lc = lowest_cutoff
         np.ndarray[np.uint8_t, ndim=2, cast=True] img = img_py
-        np.ndarray[np.int32_t, ndim=2] disks = np.ones_like(img_py, dtype=int) * -1, visited = np.ones_like(img_py, dtype=int) * -1
+        np.ndarray[np.int32_t, ndim=2] flood
         vector[int] y = y_py, x = x_py, area = [1] * tot_cand, rad = rad_py
         vector[pair[int, int]] dire = [(1, 0), (-1, 0), (0, 1), (0, -1)]
         queue[pair[int, int]] que
         pair[int, int] t, tt
-
-    # draw filled disks
-    for i in np.argsort(rad_py):
-        cv2.circle(disks, (x[i], y[i]), rad[i], i, -1)
-
+        int ys, xs, ye, se, height, width
+    floods = []
     for i in range(tot_cand):
-        t = y[i], x[i]
+        ys = max(0, y[i] - rad[i] * 2)
+        xs = max(0, x[i] - rad[i] * 2)
+        ye = min(img.shape[0], y[i] + rad[i] * 2)
+        xe = min(img.shape[1], x[i] + rad[i] * 2)
+        height = ye - ys
+        width = xe - xs
+        crop = img[ys:ye, xs:xe]
+        flood = np.zeros_like(crop, dtype=int)
+        t = y[i] - ys, x[i] - xs
+        cv2.circle(flood, (x[i] - xs, y[i] - ys), int(rad[i]), 1, -1)
         que.push(t)
-        thr = img[t.first, t.second] * cr
+        thr = crop[t.first, t.second] * cr
         if lc > thr:
             thr = lc
-        visited[t.first, t.second] = i
         while not que.empty():
             t = que.front()
             for d in dire:
                 tt = t.first + d.first, t.second + d.second
                 if height > tt.first >= 0 and width > tt.second >= 0 and \
-                        visited[tt.first, tt.second] == -1 and img[tt.first, tt.second] >= thr and \
-                        (disks[tt.first, tt.second] == i or disks[tt.first, tt.second] == -1):
+                        crop[tt.first, tt.second] >= thr and flood[tt.first, tt.second] == 1:
                     que.push(tt)
                     area[i] += 1
-                    visited[tt.first, tt.second] = i
+                    flood[tt.first, tt.second] = 255
             que.pop()
-    return area, visited
+        flood[flood == 1] = 0
+        floods.append((ys, xs, flood))
+    return area, floods
 
 @cython.boundscheck(False)
 @cython.wraparound(False)

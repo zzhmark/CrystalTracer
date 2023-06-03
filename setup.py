@@ -7,8 +7,18 @@ setup(
     author='zzh',
     ext_modules=[
         Extension(
-            'flake_detection.find_circles',
-            sources=['flake_detection/find_circles.pyx'],
+            'tracer.detection',
+            sources=['tracer/detection.pyx'],
+            language='c++',
+            include_dirs=[numpy.get_include()],
+            library_dirs=[],
+            libraries=[],
+            extra_compile_args=[],
+            extra_link_args=[]
+            ),
+        Extension(
+            'tracer.draw',
+            sources=['tracer/draw.pyx'],
             language='c++',
             include_dirs=[numpy.get_include()],
             library_dirs=[],

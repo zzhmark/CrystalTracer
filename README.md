@@ -1,4 +1,4 @@
-# BioimageChipTracer
+# CrystalTracer
 
 Measure any illuminating targets a biological images and track their movements.
 Actually there isn't any hexagon detection but maxima finding and flooding to see their 

@@ -4,17 +4,16 @@ import pandas as pd
 import numpy as np
 from pathlib import Path
 import zipfile
-import tempfile
 from multiprocessing import Pool
 from itertools import repeat
-from tracer.draw import draw_contour
+from crystal_tracer.visual.draw import draw_contour
 from tqdm import tqdm
 from io import BytesIO
 from PIL import Image
 
 
-out_folder = Path('../test_data/vid')
-flood_folder = Path('../test_data/flood')
+out_folder = Path('../../data/case1/vid')
+flood_folder = Path('../../data/case1/flood')
 
 
 def main(args):
@@ -75,9 +74,9 @@ if __name__ == '__main__':
         with zipfile.ZipFile(z) as zz:
             for tif in zz.namelist():
                 zip_dict[Path(tif).name.split('_')[1]] = z, tif
-    df_folder = Path('../test_data/detection')
+    df_folder = Path('../../data/case1/detection')
     frames = [(p.with_suffix('.tif').name, pd.read_csv(p)) for p in df_folder.glob('*.csv')]
-    with open('../test_data/traces.pickle', 'rb') as f:
+    with open('../../data/case1/traces.pickle', 'rb') as f:
         traces = pickle.load(f)
     with Pool(8) as p:
         for res in tqdm(p.imap(main, zip(traces, repeat(zip_dict, len(traces)), repeat(frames, len(traces)))),

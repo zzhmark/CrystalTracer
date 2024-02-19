@@ -6,11 +6,11 @@ import cv2
 from multiprocessing import Pool
 
 from tqdm import tqdm
-from tracer.detection import frame_detection
+from crystal_tracer.algorithm.detection import frame_detection
 
-flood_folder = Path('../test_data/flood')
+flood_folder = Path('../../data/case1/flood')
 flood_folder.mkdir(exist_ok=True)
-detection_folder = Path('../test_data/detection')
+detection_folder = Path('../../data/case1/detection')
 detection_folder.mkdir(exist_ok=True)
 
 

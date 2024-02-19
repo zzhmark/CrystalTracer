@@ -7,7 +7,7 @@ from itertools import repeat
 from tqdm import tqdm
 
 
-plot_folder = Path('../test_data/plot')
+plot_folder = Path('../../data/case1/plot')
 
 
 def main(args):
@@ -32,10 +32,10 @@ def main(args):
 
 
 if __name__ == '__main__':
-    df_folder = Path('../test_data/detection')
+    df_folder = Path('../../data/case1/detection')
     plot_folder.mkdir(exist_ok=True)
     frames = [pd.read_csv(p) for p in df_folder.glob('*.csv')]
-    with open('../test_data/traces.pickle', 'rb') as f:
+    with open('../../data/case1/traces.pickle', 'rb') as f:
         traces = pickle.load(f)
     with Pool(12) as p:
         for res in tqdm(p.imap(main, zip(traces, repeat(frames, len(traces))), chunksize=10), total=len(traces)):

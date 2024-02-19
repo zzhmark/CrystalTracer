@@ -27,6 +27,7 @@ def draw_areas(img: np.ndarray, flood: np.ndarray):
         out[flood == i] = np.random.choice(range(255), size=3)
     return out
 
+
 @cython.boundscheck(False)
 @cython.wraparound(False)
 @cython.nonecheck(False)

@@ -1,13 +1,11 @@
-from findmaxima2d import find_maxima, find_local_maxima
-from tracer.draw import *
-from tracer.detection import *
+from crystal_tracer.visual.draw import *
+from crystal_tracer.algorithm.detection import *
 from scipy.ndimage import generate_binary_structure
-from gwdt import gwdt
+from crystal_tracer.algorithm.gwdt import gwdt
 import numpy as np
 from pathlib import Path
 import pandas as pd
 from skimage.segmentation import morphological_geodesic_active_contour, disk_level_set
-import matplotlib.pyplot as plt
 from skimage.filters import difference_of_gaussians
 from skimage.feature._canny import _preprocess
 import scipy.ndimage as ndi
@@ -15,7 +13,7 @@ from skimage.morphology import dilation, disk
 
 
 if __name__ == '__main__':
-    data_dir = Path('../test_data')
+    data_dir = Path('../data')
     for gfp in (data_dir / 'in').rglob('*_GFP*.tif'):
         img = cv2.imread(str(gfp), cv2.IMREAD_GRAYSCALE)
         m = np.quantile(img, 0.0001), np.quantile(img, 0.9999)

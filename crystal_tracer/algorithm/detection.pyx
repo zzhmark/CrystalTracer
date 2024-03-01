@@ -1,14 +1,11 @@
-import os
-
 import cython
-cimport numpy as np
+cimport numpy as cnp
 from libcpp.vector cimport vector
 from libcpp.queue cimport queue
 from libcpp.pair cimport pair
 import pandas as pd
 from skimage.morphology import dilation, disk
-
-
+from libc.math cimport sqrt
 from findmaxima2d import find_maxima, find_local_maxima
 import cv2
 from scipy.ndimage import generate_binary_structure
@@ -19,26 +16,14 @@ from skimage.filters import difference_of_gaussians, threshold_local
 from skimage.feature._canny import _preprocess
 from skimage.util import img_as_ubyte
 import scipy.ndimage as ndi
-import sys
-
-class HidePrint:
-    def __init__(self):
-        self.origin = None
-    def __enter__(self):
-        sys.stdout.close()
-        sys.stdout = self.origin
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        self.origin = sys.stdout
-        sys.stdout = open(os.devnull, 'w')
 
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
 @cython.nonecheck(False)
-cpdef frame_detection(np.ndarray gfp, np.ndarray bf, thr_blk_sz=31, tolerance=10, cutoff_ratio=.1, bg_thr=.0001,
-                      active_contour=True,
-                      shift=(0, 0), dog_sigma=1., sobel_sigma=1., bf_weight=1., gfp_weight=.1, dilation_radius=2):
+cpdef frame_detection(cnp.ndarray gfp, cnp.ndarray bf, int thr_blk_sz=31, int tolerance=10, float cutoff_ratio=.1,
+                      float bg_thr=.0001, bint active_contour=True, tuple[int, int] shift=(0, 0), float dog_sigma=1.,
+                      float sobel_sigma=1., float bf_weight=1., float gfp_weight=.1, int dilation_radius=2):
     """
     Detect and segment crystals in a single frame, using gfp and bf images. When only gfp is available, you can use it
     as bf as well. The bf image will only be used in active contour.
@@ -56,107 +41,112 @@ cpdef frame_detection(np.ndarray gfp, np.ndarray bf, thr_blk_sz=31, tolerance=10
     :param bf_weight: weight of the bf image
     :param gfp_weight: weight of gfp edges to add on bf
     :param dilation_radius: the radius to dilate the segmentation, 0 to turn off.
-    :return: DataFrame, segmentation
+    :return: DataFrame, a list of masks
     """
 
     # distance transform and find centers
     fgnd_img = (gfp - threshold_local(gfp, thr_blk_sz)).clip(0)
     fgnd_img = img_as_ubyte(fgnd_img / fgnd_img.max())
-    # cv2.imwrite('../../data/fgnd.tif', fgnd_img)
     structure = generate_binary_structure(gfp.ndim, 10)
-    with HidePrint():
-        dt = gwdt(fgnd_img, structure)
-        y, x, regs = find_maxima(dt, find_local_maxima(dt), tolerance)
+    dt = gwdt(fgnd_img, structure)
+    y, x, regs = find_maxima(dt, find_local_maxima(dt), tolerance)
     rad = radius_estimate(fgnd_img, y, x, cutoff_ratio=cutoff_ratio, bg_thr=bg_thr)
-    cdef np.ndarray[np.float32_t, ndim=2] edges
-    cdef:
-        vector[float] area, new_y, new_x
-        int i, win_rad, ys, xs, ye, xe, a
-        np.ndarray[np.int64_t, ndim=1] x_, y_
-        np.ndarray[np.int8_t, ndim=2] ls
-
-    if active_contour:
-        # loading the bf image and merge them and get an edge map
-        # the gfp image provides the sobel magnitude
-        # the bf image provides the edges
-        dog = difference_of_gaussians(bf, dog_sigma)
-        smoothed, eroded_mask = _preprocess(gfp, None, sobel_sigma, 'constant', 0)
-        jsobel = ndi.sobel(smoothed, axis=1)
-        isobel = ndi.sobel(smoothed, axis=0)
-        magnitude = isobel * isobel
-        magnitude += jsobel * jsobel
-        np.sqrt(magnitude, out=magnitude)
-        magnitude = cv2.warpAffine(magnitude, np.array([[1, 0, shift[0]], [0, 1, shift[1]]], dtype=float),
-                                   (gfp.shape[1], gfp.shape[0]))
-        edges = (bf_weight * dog - magnitude * gfp_weight).astype(np.float32)
-
-        # rad is for initiating contours
-        seg = []
-        for i, (yy, xx, rr) in enumerate(zip(y, x, rad)):
-            win_rad = int(rr * 2)
-            ys = max(0, yy - win_rad)
-            xs = max(0, xx - win_rad)
-            ye = min(bf.shape[0], yy + win_rad)
-            xe = min(bf.shape[1], xx + win_rad)
-            sub_img = edges[ys:ye, xs:xe].astype(float)
-            ls = morphological_geodesic_active_contour(sub_img, 20, disk_level_set(sub_img.shape, radius=rr))
-            if dilation_radius > 0:
-                ls = dilation(ls, disk(dilation_radius))
-            a = np.sum(ls > 0)
-            if a > 0:
-                area.push_back(a)
-                seg.append(ls)
-                y_, x_ = np.nonzero(ls)
-                new_y.push_back(y_.mean() + ys)
-                new_x.push_back(x_.mean() + xs)
-
-        return pd.DataFrame({'y': new_y, 'x': new_x, 'area': area}), seg
-
-    seg = area_estimate(fgnd_img, y, x, rad, cutoff_ratio=.1)
-
-    return pd.DataFrame({'y': y, 'x': x, 'radius': rad}), seg
+    new_y, new_x, new_rad, area, ys_list, xs_list, masks = \
+        contour_estimate(gfp, bf, y, x, rad, shift, dog_sigma,
+                         sobel_sigma, bf_weight, gfp_weight, dilation_radius) if active_contour else \
+            flood_estimate(fgnd_img, y, x, rad, cutoff_ratio=cutoff_ratio)
+    return pd.DataFrame(
+        {'y': new_y, 'x': new_x, 'radius': new_rad, 'area': area, 'y_start': ys_list, 'x_start': xs_list}), masks
 
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
 @cython.nonecheck(False)
-def radius_estimate(img, y, x, cutoff_ratio=0.5, bg_thr=.001, lowest_cutoff=0):
-    """
-    Estimate radius of d circles
-
-    :param lowest_cutoff: the threshold between chips and background
-    :param bg_thr: the rate of bg pixel detected to stop the radius enlargement
-    :param img: the input image, gfp
-    :param y: y coords
-    :param x: x coords
-    :param cutoff_ratio: the threshold based on the chip intensity is determined by this rate
-    :return: a list of radius
-    """
-    assert len(x) == len(y)
+cpdef contour_estimate(cnp.ndarray gfp, cnp.ndarray bf, const vector[int]& y, const vector[int]& x,
+                       const vector[int]& rad, tuple[int, int] shift=(0, 0), float dog_sigma=1.,
+                       float sobel_sigma=1., float bf_weight=1., float gfp_weight=.1, int dilation_radius=2):
     cdef:
-        int tot_cand = len(y), i, j, k, width = img.shape[1], height = img.shape[0], tot, bg, dy, dx
-        float cr = cutoff_ratio, thr, r, bg_th = bg_thr, lc = lowest_cutoff
-        np.ndarray[np.uint8_t, ndim=2, cast=True] img_c = img
-        vector[int] y_c = y, x_c = x, rad = [0] * tot_cand
-    for i in range(tot_cand):
-        tot = bg = 0
-        thr = img_c[y_c[i], x_c[i]] * cr
-        if lc > thr:
-            thr = lc
+        int i, win_rad, ys, xs, ye, xe, area, height = gfp.shape[0], width = gfp.shape[1]
+        cnp.ndarray[cnp.float32_t, ndim=2] edges
+        vector[float] new_y, new_x
+        vector[int] new_rad, ys_list, xs_list, area_list
+        cnp.ndarray[cnp.int64_t, ndim=1] x_, y_
+        cnp.ndarray[cnp.uint8_t, ndim=2] ls
+        list masks = []
+    # loading the bf image and merge them and get an edge map
+    # the gfp image provides the sobel magnitude
+    # the bf image provides the edges
+    dog = difference_of_gaussians(bf, dog_sigma)
+    smoothed = _preprocess(gfp, None, sobel_sigma, 'constant', 0)[0]
+    jsobel = ndi.sobel(smoothed, axis=1)
+    isobel = ndi.sobel(smoothed, axis=0)
+    magnitude = isobel * isobel + jsobel * jsobel
+    np.sqrt(magnitude, out=magnitude)
+    magnitude = cv2.warpAffine(magnitude, np.array([[1, 0, shift[0]], [0, 1, shift[1]]], dtype=float),
+                               (gfp.shape[1], gfp.shape[0]))
+    edges = (bf_weight * dog - magnitude * gfp_weight).astype(np.float32)
+
+    for i in range(y.size()):
+        win_rad = rad[i] * 2
+        ys = max(0, y[i] - win_rad)
+        xs = max(0, x[i] - win_rad)
+        ye = min(height, y[i] + win_rad)
+        xe = min(width, x[i] + win_rad)
+        ls = morphological_geodesic_active_contour(
+            edges[ys:ye, xs:xe], 20, disk_level_set((ye-ys, xe-xs), radius=rad[i])).astype(np.uint8)
+        if dilation_radius > 0:
+            ls = dilation(ls, disk(dilation_radius))
+        area = np.sum(ls > 0)
+        if area > 0:
+            ys_list.push_back(ys)
+            xs_list.push_back(xs)
+            area_list.push_back(area)
+            new_rad.push_back(rad[i])
+            masks.append(ls)
+            y_, x_ = np.nonzero(ls)
+            new_y.push_back(y_.mean() + ys)
+            new_x.push_back(x_.mean() + xs)
+    return new_y, new_x, new_rad, area, ys_list, xs_list, masks
+
+
+@cython.boundscheck(False)
+@cython.wraparound(False)
+@cython.nonecheck(False)
+cpdef radius_estimate(cnp.ndarray[cnp.uint8_t, ndim=2] img, const vector[int]& y, const vector[int]& x,
+                      float cutoff_ratio=0.5, float bg_thr=.001, float lowest_cutoff=0):
+    """
+    Estimate the radii of crystals
+
+    :param img: the input fluorescent image
+    :param y: y coords of the seeds
+    :param x: x coords of the seeds
+    :param cutoff_ratio: the threshold based on the chip intensity is determined by this rate
+    :param bg_thr: the rate of bg pixel detected to stop the radius enlargement
+    :param lowest_cutoff: the cutoff should be more than this
+    :return: a list of radii for each seed
+    """
+    cdef:
+        int i, j, k, width = img.shape[1], height = img.shape[0], tot_count, bg_count, dy, dx
+        vector[int] rad
+
+    for i in range(y.size()):
+        rad.push_back(0)
+        tot_count = bg_count = 0
+        thr = max(img[y[i], x[i]] * cutoff_ratio, lowest_cutoff)
         while True:
             rad[i] += 1
             for dy in range(-rad[i], rad[i] + 1):
                 for dx in range(-rad[i], rad[i] + 1):
-                    r = (dy**2 + dx**2)**.5
-                    tot += 1
+                    r = sqrt(dy*dy + dx*dx)
+                    tot_count += 1
                     if rad[i] - 1 < r <= rad[i]:
-                        j = y_c[i] + dy
-                        k = x_c[i] + dx
+                        j = y[i] + dy
+                        k = x[i] + dx
                         if not 0 <= j < height or not 0<= k < width:    # hit the border
                             break
-                        if img_c[j, k] < thr:
-                            bg += 1
-                            if float(bg) / tot > bg_th:
+                        if img[j, k] < thr:
+                            bg_count += 1
+                            if float(bg_count) / tot_count > bg_thr:
                                 break
                 else:
                     continue
@@ -170,55 +160,63 @@ def radius_estimate(img, y, x, cutoff_ratio=0.5, bg_thr=.001, lowest_cutoff=0):
 @cython.boundscheck(False)
 @cython.wraparound(False)
 @cython.nonecheck(False)
-def area_estimate(img, y, x, rad_py, cutoff_ratio=0.5, lowest_cutoff=0):
+cpdef flood_estimate(cnp.ndarray[cnp.uint8_t, ndim=2] img, const vector[int]& y, const vector[int]& x,
+                     const vector[int]& rad, float cutoff_ratio=0.5, float lowest_cutoff=0):
     """
-    Count area by flooding, based on radius estimate results.
-    :param lowest_cutoff:
-    :param img:
-    :param y:
-    :param x:
-    :param cutoff_ratio:
+    Measure crystal sizes by flooding, based on radius estimate results.
+    :param img: input fluorescent image
+    :param y: y coordinates of seeds
+    :param x: x coordinates of seeds
+    :param rad: radii of the candidate crystals
+    :param cutoff_ratio: the ratio between the seed intensity and background
+    :param lowest_cutoff: the cutoff should be more than this
     :return:
     """
-    assert len(x) == len(y) == len(rad_py)
     cdef:
-        int tot_cand = len(y), i, j, k
-        float cr = cutoff_ratio, thr, lc = lowest_cutoff
-        np.ndarray[np.uint8_t, ndim=2, cast=True] img_c = img
-        np.ndarray[np.int32_t, ndim=2] flood
-        vector[int] y_c = y, x_c = x, area = [1] * tot_cand, rad = rad_py
-        vector[pair[int, int]] dire = [(1, 0), (-1, 0), (0, 1), (0, -1)]
+        int i, j, k, ys, xs, ye, se, height, width, area
+        float thr
+        cnp.ndarray[cnp.int32_t, ndim=2] flood
+        vector[float] new_y, new_x
+        vector[int] area_list, ys_list, xs_list, new_rad
+        vector[pair[int, int]] shift = [(1, 0), (-1, 0), (0, 1), (0, -1)]
         queue[pair[int, int]] que
         pair[int, int] t, tt
-        int ys, xs, ye, se, height, width
-    floods = []
-    for i in range(tot_cand):
-        ys = max(0, y_c[i] - rad[i] * 2)
-        xs = max(0, x_c[i] - rad[i] * 2)
-        ye = min(img_c.shape[0], y_c[i] + rad[i] * 2)
-        xe = min(img_c.shape[1], x_c[i] + rad[i] * 2)
+        list masks = []
+
+    for i in range(y.size()):
+        ys = max(0, y[i] - rad[i] * 2)
+        xs = max(0, x[i] - rad[i] * 2)
+        ye = min(img.shape[0], y[i] + rad[i] * 2)
+        xe = min(img.shape[1], x[i] + rad[i] * 2)
         height = ye - ys
         width = xe - xs
-        crop = img_c[ys:ye, xs:xe]
+        crop = img[ys:ye, xs:xe]
         flood = np.zeros_like(crop, dtype=int)
-        t = y_c[i] - ys, x_c[i] - xs
-        cv2.circle(flood, (x_c[i] - xs, y_c[i] - ys), int(rad[i]), 1, -1)
+        t = y[i] - ys, x[i] - xs
+        cv2.circle(flood, (x[i] - xs, y[i] - ys), int(rad[i]), 1, -1)
         que.push(t)
-        thr = crop[t.first, t.second] * cr
-        if lc > thr:
-            thr = lc
+        thr = crop[t.first, t.second] * cutoff_ratio
+        if lowest_cutoff > thr:
+            thr = lowest_cutoff
+        area = 0
         while not que.empty():
             t = que.front()
-            for d in dire:
+            for d in shift:
                 tt = t.first + d.first, t.second + d.second
                 if height > tt.first >= 0 and width > tt.second >= 0 and \
                         crop[tt.first, tt.second] >= thr and flood[tt.first, tt.second] == 1:
                     que.push(tt)
-                    area[i] += 1
+                    area += 1
                     flood[tt.first, tt.second] = 255
             que.pop()
         flood[flood == 1] = 0
-        floods.append((ys, xs, flood))
-    return area, floods
+        masks.append(flood.astype(np.uint8))
+        area_list.push_back(area)
+        ys_list.push_back(ys)
+        xs_list.push_back(xs)
+        new_y.push_back(y[i])
+        new_x.push_back(x[i])
+        new_rad.push_back(rad[i])
+    return new_y, new_x, new_rad, area, ys_list, xs_list, masks
 
 

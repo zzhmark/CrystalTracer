@@ -5,21 +5,24 @@ from tqdm import tqdm
 from sklearn.linear_model import LinearRegression
 
 
-def independant_match(frames, dist_thr=20, nn=5, time_gap_thr=10, time_sampling_range=(10, 100),
-                      max_area_overflow=.2, max_area_diff=25.):
+def independent_match(tables, dist_thr=20, nn=5, time_gap_thr=10, time_sampling_range=(10, 100),
+                      max_area_overflow=.2, max_area_diff=25., callback=None):
     """
+    Connect the crystals in each frame in and independent manner, starting from the last frame. It forms a track for
+    each crystal in the last frame until it disappears in reverse time order. The output will be reversed back.
 
-    :param frames: a list of dataframes of detected crystals
+    :param tables: a list of dataframes of detected crystals
     :param dist_thr: the radius range for match the crystal
     :param nn: number of nearest neighboring crystals considered for matching
     :param time_gap_thr: max time gap allowed in the track
     :param time_sampling_range: area sampling window
-    :param max_area_overflow:
-    :param max_area_diff:
+    :param max_area_overflow: the max ratio of area difference
+    :param max_area_diff: the max exact area difference in pixel
+    :param callback: a function to call in each iteration
     :return: identified tracks, a list of lists of tuples, (frame, index)
     """
     # invert the frames
-    frames.reverse()
+    tables = [*reversed(tables)]
 
     # init from the last frame
     # chains: the tracks. list of (frame, crystal_id)
@@ -28,7 +31,7 @@ def independant_match(frames, dist_thr=20, nn=5, time_gap_thr=10, time_sampling_
     tracks = []
     prev_pos = []
     pred_area = []
-    for ind, row in frames[0].iterrows():
+    for ind, row in tables[0].iterrows():
         tracks.append([(0, ind)])
         prev_pos.append(row[['y', 'x']].tolist())
         pred_area.append(row['area'])  # init as the start crystal size
@@ -37,7 +40,7 @@ def independant_match(frames, dist_thr=20, nn=5, time_gap_thr=10, time_sampling_
     # no enough points, return just average
     def area_fit(chain):
         x = [c[0] for c in chain]  # time frame
-        y = [frames[c[0]].at[c[1], 'area'] for c in chain]
+        y = [tables[c[0]].at[c[1], 'area'] for c in chain]
         if len(x) < time_sampling_range[0] or x[-1] - x[0] < time_sampling_range[
             1]:  # when there is not enough or time frame is too short
             return np.mean(y)
@@ -51,12 +54,13 @@ def independant_match(frames, dist_thr=20, nn=5, time_gap_thr=10, time_sampling_
         else:
             return mod
 
+    callback()
     # start tracking from the one but last frame
-    for i_frame in tqdm(range(1, len(frames))):
+    for i_frame in tqdm(range(1, len(tables))):
         # try mapping all current crystals onto the tracks
 
         track_tree = KDTree(prev_pos)  # kdtree based on previous tracks' end coordinates
-        df: pd.DataFrame = frames[i_frame]  # dataframe of current detections
+        df: pd.DataFrame = tables[i_frame]  # dataframe of current detections
 
         # the assignment of detections to tracks has a priority
         # the detections with less competition is considered first
@@ -109,7 +113,7 @@ def independant_match(frames, dist_thr=20, nn=5, time_gap_thr=10, time_sampling_
             tracks[e].append((i_frame, p))
             prev_pos[e] = cur_pos[p]
             pred_area[e] = area_fit(tracks[e])
+        if callback is not None:
+            callback()
 
-    # invert back
-    frames.reverse()
     return tracks

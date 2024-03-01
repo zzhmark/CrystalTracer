@@ -2,7 +2,7 @@ import pickle
 import numpy as np
 from pathlib import Path
 from crystal_tracer.algorithm.detection import frame_detection
-from crystal_tracer.algorithm.tracking import independant_match
+from crystal_tracer.algorithm.tracking import independent_match
 import matplotlib.pyplot as plt
 import cv2
 from crystal_tracer.visual.draw import draw_contour
@@ -107,7 +107,7 @@ if __name__ == '__main__':
 
             # tracking
             frames = [r.get() for r in resp]
-            track = independant_match(frames)
+            track = independent_match(frames)
             with open(outpath / 'traces.pickle', 'wb') as f:
                 pickle.dump(track, f)
 

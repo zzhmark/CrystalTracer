@@ -1,3 +1,3 @@
 from .gwdt import gwdt
 
-all = [gwdt]
+__all__ = ['gwdt']

@@ -16,41 +16,64 @@ pip install -r requirements.txt
 python setup.py build_ext --inplace
 ```
 
-The `findmaxima2d` may contain some deprecated numpy codes, if you use the higher version of
-python, you can modify the package code manually to make it work.
+The `findmaxima2d` contains deprecated numpy implementations. When using newer versions of
+python, it becomes necessary to hack the package code to solve the errors.
 
 I forked a third party source code `gwdt` for distance transforming. This one and some modules I
 wrote need cython building before you run anything. The build options are located in `setup.py`
 
 ## User Guide
 
-### Basic steps
+### GUI
 
-The main processing functions are in `tracer`. Some functions are parameterized while
-some others are not for faster development. Feel free to change the code because it's not a package.
+Run `crystal_tracer/gui/main.py` to use the GUI tool for the pipeline.
 
-Note that pyx files are those cythonized. You must rebuild the code to make your change work.
+Features:
 
-First, the chips are detected as local maxima using a measure same with imageJ, which is available as a pypi package
-named `findmaxima2d`
+1. multiprocessing with low memory cost
+2. highly interactive visualization of intermediate results for tuning parameters
+3. save/load configuration (of paths & parameters)
+4. automatic navigation & file storage in a designated working directory
+5. exporting tracking video and animated plots
+6. easy-to-use shortcuts
+7. accepts only CZI image as input
 
-With local maxima found, `detection.pyx` detects measures the shape and area of the chips. It estimates the radius of
-the chip and uses active contour to fit the border to get the segmentation.
+### Modules
 
-`tracking.py` connects detected chips to create tracks. It backtracks from the
-last frame usually with highly confident chips to go back to find their smaller ancestors.
+`crystal_tracer.algorithm` contains the CV methods for crystal detection and path tracking. Use cython
+and opencv to speed up computation.
 
-`draw.pyx` is used to plot circles, segmentations and contours. They are used to make videos.
+`crystal_tracer.visual` provides basic visualization methods, including masking and video generation.
 
-The module `gwdt` is forked for the image processing before maxima finding.
+`crystal_tracer.gui` contains the GUI modules.
 
-### Pipeline script for an image series archive
+## Pipeline explanation
 
-The above steps are integrated for a bunch of real data in `pipeline` in a parallel computing manner. 
+### Step 1: crystal detection
 
-* `filter_stacks.py` is for batch detection for all the image frames in parallel.
-* `track_detections.py` just call the tracking.
-* `area_plot.py` plots the growth of area for each track.
-* `filming.py` generates growth videos for each track.
+Frame by frame detection of crystals. For each frame, generating a table of crystal properties (coords, size, etc.)
+and masks. They are numbered according to their timestamp.
 
-Because I put the image series in multiple zip files, this pipeline does a lot of unzipping.
+There are currently 2 modes for masking. One is flooding, the other is active contour. The latter is more
+stable and a bit more costly, and it can use the bright field image (but totally fine w/o it).
+
+Parameters are highly adaptive. The block size should be high enough to cover the crystals, the
+tolerance should be high when the background is packed with illuminant stuff.
+
+### Step 2: path tracking
+
+Starting from the crystals in the last frame, making tracks for each of them independently.
+It's highly possible that different tracks can share common crystals along the path, especially
+in dense regions. A neighborhood matching technique is adopted to compare the crystal candidates
+more robustly.
+
+To allow for more aggressive tracking, you can increase the distance threshold and time gap, as well as
+relaxing the area restrictions. Typically, the distance threshold should be no more
+than the biggest motion distance of the crystals. The time gap allows the tracking to be continued
+when the current frame contains no useable candidate for a track. A big gap can easily let crystals bounce
+to other tracks. The candidate crystals for each track are dynamically judged by prediction
+from previous values, so the area can be kept more stable and invalid crystals are excluded.
+
+### Step 3: plotting
+
+Plotting the animated line plot of crystal sizes and making videos for each track.

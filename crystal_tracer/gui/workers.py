@@ -5,6 +5,7 @@ from crystal_tracer.algorithm.detection import frame_detection
 from crystal_tracer.algorithm.tracking import independent_match
 from crystal_tracer.visual.video import make_video
 from crystal_tracer.visual.draw import draw_patches
+import matplotlib.animation as animation
 from skimage.util import img_as_ubyte
 import numpy as np
 from multiprocessing import Pool
@@ -32,15 +33,14 @@ class HidePrint:
         sys.stdout = open(os.devnull, 'w')
 
 
-def detection_task(time, img_path, gfp_channel, bf_channel, page, save_dir, *args):
-    gfp = load_czi_slice(img_path, gfp_channel, page)
+def detection_task(time: int, img_path: Path, gfp_channel: int, bf_channel: int, save_dir: Path, *args):
+    gfp = load_czi_slice(img_path, gfp_channel, time)
     if gfp_channel == bf_channel:
         bf = gfp
     else:
-        bf = load_czi_slice(img_path, bf_channel, page)
+        bf = load_czi_slice(img_path, bf_channel, time)
     with HidePrint():
         table, mask = frame_detection(gfp, bf, *args)
-    save_dir = Path(save_dir)
     np.savez(save_dir / f'{time}.npz', *mask)
     table.to_csv(save_dir / f'{time}.csv', index=False)
 
@@ -87,30 +87,52 @@ class TrackingTask(QThread):
             pickle.dump(tracks, f)
 
 
-def plot_area(path, track, tables, max_area=300):
+def plot_area(path, track, tables, max_area=500):
     x, y = [], []
-    tot = len(tables)
     for i, j in track:
-        x.append(tot - i - 1)
+        x.append(i)
         y.append(tables[x[-1]].at[j, 'area'])
+    pd.DataFrame({
+        'time': x,
+        'area': y
+    }).to_csv(path.with_suffix('.csv'), index=False)
+
+    time_interp = np.linspace(x[0], x[-1], x[-1] - x[0] + 1)
+    area_interp = np.interp(time_interp, x, y)
+
     fig, ax = plt.subplots()
-    ax.plot(x, y)
+    ax.set_aspect('equal')
+    line, = ax.plot([], [])
     ax.set_xlabel('Time elapse')
     ax.set_ylabel('Crystal area')
-    ax.set_xlim(0, tot)
+    ax.set_xlim(0, len(tables))
+    ax.set_xlim(0, len(tables))
     ax.set_ylim(0, max_area)
-    fig.savefig(path, dpi=300)
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+
+    def init():
+        line.set_data([], [])
+        return line,
+
+    def animate(i):
+        line.set_data(time_interp[:i], area_interp[:i])
+        return line,
+
+    ani = animation.FuncAnimation(fig, animate, len(time_interp), init, interval=20, blit=True, repeat=False)
+    ani.save(path.with_suffix('.mp4'), writer='ffmpeg')
     plt.close(fig)
 
 
 class RecordingTask(QThread):
     increment = Signal()
 
-    def __init__(self, max_thread, tracks, save_dir, img_path, table_paths, mask_paths, win_rad, frame_rate):
+    def __init__(self, max_thread: int, tracks: list[list[tuple[int, int]]], save_dir: Path, img_path: Path,
+                 table_paths: list[Path], mask_paths: list[Path], win_rad: int, frame_rate: float):
         super().__init__()
         self.max_thread = max_thread
         self.tracks = tracks
-        self.save_dir = Path(save_dir)
+        self.save_dir = save_dir
         self.img_path = img_path
         self.table_paths = table_paths
         self.mask_paths = mask_paths
@@ -135,7 +157,7 @@ class RecordingTask(QThread):
             tables = asyncio.run(load_all_tables())
 
             for i, result in tqdm(enumerate(results), total=len(results)):
-                plot_area(self.save_dir / f'{i}.png', self.tracks[i], tables)
+                plot_area(self.save_dir / f'{i}.mp4', self.tracks[i], tables)
                 result.wait()
                 self.increment.emit()
 
@@ -159,3 +181,42 @@ class PreviewRunner(QThread):
             table, masks = frame_detection(gfp, bf, *self.args)
 
         self.img = draw_patches(img_as_ubyte(gfp), table['y_start'].to_list(), table['x_start'].to_list(), masks)
+
+
+class WalkRunner(QThread):
+    def __init__(self, tracks: list[list[tuple[int, int]]], table_paths: list[Path]):
+        super().__init__()
+        self.tracks = tracks
+        self.table_paths = table_paths
+        self.timescale = None
+        self.walks = None
+
+    def run(self):
+
+        async def async_read_csv(path):
+            async with aiofiles.open(path, 'r') as f:
+                content = await f.read()
+                return pd.read_csv(StringIO(content))
+
+        async def load_all_tables():
+            coroutines = [async_read_csv(path) for path in self.table_paths]
+            return await asyncio.gather(*coroutines)
+
+        tables = asyncio.run(load_all_tables())
+
+        self.walks = []
+        tot = len(tables)
+        self.timescale = np.linspace(0, tot - 1, tot)
+        for t in self.tracks:
+            xx = []
+            yy = []
+            time = []
+            for i, j in t:
+                y, x = tables[i].loc[j, ['y', 'x']].to_numpy().ravel()
+                yy.append(y)
+                xx.append(x)
+                time.append(i)
+            new_time = self.timescale[time[0]:time[-1] + 1]
+            yy = np.interp(new_time, time, yy)
+            xx = np.interp(new_time, time, xx)
+            self.walks.append(np.array([xx, yy, new_time]))

@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>1280</width>
-    <height>889</height>
+    <width>1425</width>
+    <height>804</height>
    </rect>
   </property>
   <property name="sizePolicy">
@@ -155,14 +155,14 @@
          <enum>QFrame::Raised</enum>
         </property>
         <property name="currentIndex">
-         <number>2</number>
+         <number>0</number>
         </property>
         <widget class="QWidget" name="panel_detection">
          <layout class="QVBoxLayout" name="verticalLayout_4">
           <item>
            <layout class="QHBoxLayout" name="horizontalLayout_2">
             <item>
-             <widget class="QGroupBox" name="groupBox_4">
+             <widget class="QGroupBox" name="group_input">
               <property name="title">
                <string>Input</string>
               </property>
@@ -238,7 +238,7 @@
                   <number>2</number>
                  </property>
                  <property name="value">
-                  <number>21</number>
+                  <number>41</number>
                  </property>
                 </widget>
                </item>
@@ -486,6 +486,9 @@
                  <property name="alignment">
                   <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
                  </property>
+                 <property name="maximum">
+                  <number>1000</number>
+                 </property>
                  <property name="value">
                   <number>20</number>
                  </property>
@@ -518,7 +521,7 @@
              </widget>
             </item>
             <item>
-             <widget class="QGroupBox" name="groupBox_5">
+             <widget class="QGroupBox" name="group_output">
               <property name="title">
                <string>Output</string>
               </property>
@@ -682,82 +685,6 @@
                  <string>Independant Matching</string>
                 </attribute>
                 <layout class="QGridLayout" name="gridLayout_3">
-                 <item row="6" column="0">
-                  <widget class="QLabel" name="label_19">
-                   <property name="toolTip">
-                    <string>area sampling window, upper threshold</string>
-                   </property>
-                   <property name="text">
-                    <string>time range upper</string>
-                   </property>
-                  </widget>
-                 </item>
-                 <item row="4" column="1">
-                  <widget class="QDoubleSpinBox" name="area_diff">
-                   <property name="alignment">
-                    <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
-                   </property>
-                   <property name="stepType">
-                    <enum>QAbstractSpinBox::AdaptiveDecimalStepType</enum>
-                   </property>
-                   <property name="value">
-                    <double>25.000000000000000</double>
-                   </property>
-                  </widget>
-                 </item>
-                 <item row="1" column="0">
-                  <widget class="QLabel" name="label_14">
-                   <property name="toolTip">
-                    <string>the number of neighboring crystals considered for matching</string>
-                   </property>
-                   <property name="text">
-                    <string>number of neighbours</string>
-                   </property>
-                  </widget>
-                 </item>
-                 <item row="1" column="1">
-                  <widget class="QSpinBox" name="nn">
-                   <property name="alignment">
-                    <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
-                   </property>
-                   <property name="minimum">
-                    <number>1</number>
-                   </property>
-                   <property name="value">
-                    <number>5</number>
-                   </property>
-                  </widget>
-                 </item>
-                 <item row="4" column="0">
-                  <widget class="QLabel" name="label_17">
-                   <property name="toolTip">
-                    <string>max area difference in pixel</string>
-                   </property>
-                   <property name="text">
-                    <string>max area difference</string>
-                   </property>
-                  </widget>
-                 </item>
-                 <item row="3" column="0">
-                  <widget class="QLabel" name="label_16">
-                   <property name="toolTip">
-                    <string>max area difference in ratio</string>
-                   </property>
-                   <property name="text">
-                    <string>max area overflow</string>
-                   </property>
-                  </widget>
-                 </item>
-                 <item row="0" column="0">
-                  <widget class="QLabel" name="label_13">
-                   <property name="toolTip">
-                    <string>the radius range for match the crystal</string>
-                   </property>
-                   <property name="text">
-                    <string>distance threshold</string>
-                   </property>
-                  </widget>
-                 </item>
                  <item row="0" column="1">
                   <widget class="QDoubleSpinBox" name="dist_thr">
                    <property name="alignment">
@@ -774,7 +701,43 @@
                    </property>
                   </widget>
                  </item>
-                 <item row="7" column="0" colspan="2">
+                 <item row="6" column="1">
+                  <widget class="QSpinBox" name="min_sampling_elapse">
+                   <property name="alignment">
+                    <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+                   </property>
+                   <property name="minimum">
+                    <number>1</number>
+                   </property>
+                   <property name="maximum">
+                    <number>1000</number>
+                   </property>
+                   <property name="value">
+                    <number>10</number>
+                   </property>
+                  </widget>
+                 </item>
+                 <item row="4" column="0">
+                  <widget class="QLabel" name="label_17">
+                   <property name="toolTip">
+                    <string>max area difference in pixel</string>
+                   </property>
+                   <property name="text">
+                    <string>max area difference</string>
+                   </property>
+                  </widget>
+                 </item>
+                 <item row="0" column="0">
+                  <widget class="QLabel" name="label_13">
+                   <property name="toolTip">
+                    <string>the radius range for match the crystal</string>
+                   </property>
+                   <property name="text">
+                    <string>distance threshold</string>
+                   </property>
+                  </widget>
+                 </item>
+                 <item row="8" column="0" colspan="2">
                   <spacer name="verticalSpacer">
                    <property name="orientation">
                     <enum>Qt::Vertical</enum>
@@ -787,18 +750,18 @@
                    </property>
                   </spacer>
                  </item>
-                 <item row="5" column="0">
-                  <widget class="QLabel" name="label_18">
+                 <item row="3" column="0">
+                  <widget class="QLabel" name="label_16">
                    <property name="toolTip">
-                    <string>area sampling window, lower threshold</string>
+                    <string>max area difference in ratio</string>
                    </property>
                    <property name="text">
-                    <string>time range lower</string>
+                    <string>max area overflow</string>
                    </property>
                   </widget>
                  </item>
                  <item row="5" column="1">
-                  <widget class="QSpinBox" name="time_range_lower">
+                  <widget class="QSpinBox" name="min_sampling_count">
                    <property name="alignment">
                     <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
                    </property>
@@ -806,7 +769,63 @@
                     <number>1</number>
                    </property>
                    <property name="value">
+                    <number>5</number>
+                   </property>
+                  </widget>
+                 </item>
+                 <item row="6" column="0">
+                  <widget class="QLabel" name="label_19">
+                   <property name="toolTip">
+                    <string>min elapse of time for area fitting</string>
+                   </property>
+                   <property name="text">
+                    <string>min sampling elapse</string>
+                   </property>
+                  </widget>
+                 </item>
+                 <item row="1" column="1">
+                  <widget class="QSpinBox" name="nn">
+                   <property name="alignment">
+                    <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+                   </property>
+                   <property name="minimum">
+                    <number>5</number>
+                   </property>
+                   <property name="value">
                     <number>10</number>
+                   </property>
+                  </widget>
+                 </item>
+                 <item row="1" column="0">
+                  <widget class="QLabel" name="label_14">
+                   <property name="toolTip">
+                    <string>the number of neighboring crystals considered for matching</string>
+                   </property>
+                   <property name="text">
+                    <string>number of neighbours</string>
+                   </property>
+                  </widget>
+                 </item>
+                 <item row="5" column="0">
+                  <widget class="QLabel" name="label_18">
+                   <property name="toolTip">
+                    <string>min No. of points for area fitting</string>
+                   </property>
+                   <property name="text">
+                    <string>min sampling count</string>
+                   </property>
+                  </widget>
+                 </item>
+                 <item row="3" column="1">
+                  <widget class="QDoubleSpinBox" name="area_overflow">
+                   <property name="alignment">
+                    <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+                   </property>
+                   <property name="stepType">
+                    <enum>QAbstractSpinBox::AdaptiveDecimalStepType</enum>
+                   </property>
+                   <property name="value">
+                    <double>0.500000000000000</double>
                    </property>
                   </widget>
                  </item>
@@ -820,42 +839,55 @@
                    </property>
                   </widget>
                  </item>
-                 <item row="6" column="1">
-                  <widget class="QSpinBox" name="time_range_upper">
-                   <property name="alignment">
-                    <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
-                   </property>
-                   <property name="minimum">
-                    <number>1</number>
-                   </property>
-                   <property name="maximum">
-                    <number>1000</number>
-                   </property>
-                   <property name="value">
-                    <number>100</number>
-                   </property>
-                  </widget>
-                 </item>
                  <item row="2" column="1">
                   <widget class="QSpinBox" name="time_gap">
                    <property name="alignment">
                     <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
                    </property>
                    <property name="value">
-                    <number>10</number>
+                    <number>5</number>
                    </property>
                   </widget>
                  </item>
-                 <item row="3" column="1">
-                  <widget class="QDoubleSpinBox" name="area_overflow">
+                 <item row="4" column="1">
+                  <widget class="QDoubleSpinBox" name="area_diff">
                    <property name="alignment">
                     <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+                   </property>
+                   <property name="maximum">
+                    <double>1000.000000000000000</double>
                    </property>
                    <property name="stepType">
                     <enum>QAbstractSpinBox::AdaptiveDecimalStepType</enum>
                    </property>
                    <property name="value">
-                    <double>0.200000000000000</double>
+                    <double>100.000000000000000</double>
+                   </property>
+                  </widget>
+                 </item>
+                 <item row="7" column="0">
+                  <widget class="QLabel" name="label_29">
+                   <property name="toolTip">
+                    <string>No. of points for predicting position</string>
+                   </property>
+                   <property name="text">
+                    <string>position sampling count</string>
+                   </property>
+                  </widget>
+                 </item>
+                 <item row="7" column="1">
+                  <widget class="QSpinBox" name="pos_sampling_count">
+                   <property name="alignment">
+                    <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+                   </property>
+                   <property name="minimum">
+                    <number>2</number>
+                   </property>
+                   <property name="maximum">
+                    <number>1000</number>
+                   </property>
+                   <property name="value">
+                    <number>3</number>
                    </property>
                   </widget>
                  </item>
@@ -945,7 +977,13 @@
            </widget>
           </item>
           <item>
-           <widget class="QGroupBox" name="groupBox_6">
+           <widget class="QGroupBox" name="group_tracks">
+            <property name="sizePolicy">
+             <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
+              <horstretch>0</horstretch>
+              <verstretch>0</verstretch>
+             </sizepolicy>
+            </property>
             <property name="title">
              <string>Tracking result</string>
             </property>
@@ -963,17 +1001,17 @@
              <item>
               <layout class="QHBoxLayout" name="horizontalLayout_3">
                <item>
-                <widget class="QProgressBar" name="tracking_vis_progress">
-                 <property name="value">
-                  <number>0</number>
+                <widget class="QSlider" name="play_bar">
+                 <property name="orientation">
+                  <enum>Qt::Horizontal</enum>
                  </property>
-                 <property name="alignment">
-                  <set>Qt::AlignBottom|Qt::AlignLeading|Qt::AlignLeft</set>
+                 <property name="tickPosition">
+                  <enum>QSlider::TicksAbove</enum>
                  </property>
                 </widget>
                </item>
                <item>
-                <widget class="QPushButton" name="visualize_tracking">
+                <widget class="QPushButton" name="visualize_tracks">
                  <property name="toolTip">
                   <string>Ctrl+V</string>
                  </property>
@@ -1033,7 +1071,7 @@
              </layout>
             </item>
             <item>
-             <widget class="QGroupBox" name="groupBox_8">
+             <widget class="QGroupBox" name="group_plot">
               <property name="title">
                <string>Growth plot</string>
               </property>
@@ -1052,7 +1090,7 @@
              </widget>
             </item>
             <item>
-             <widget class="QGroupBox" name="groupBox_9">
+             <widget class="QGroupBox" name="group_video">
               <property name="title">
                <string>Growth video</string>
               </property>
@@ -1310,7 +1348,7 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>1280</width>
+     <width>1425</width>
      <height>21</height>
     </rect>
    </property>
@@ -1332,6 +1370,9 @@
     <addaction name="separator"/>
     <addaction name="action_open_wkdir"/>
     <addaction name="action_set_wkdir"/>
+    <addaction name="separator"/>
+    <addaction name="action_save_config"/>
+    <addaction name="action_load_config"/>
    </widget>
    <widget class="QMenu" name="menuHelp">
     <property name="title">
@@ -1347,7 +1388,7 @@
     <string>Import image</string>
    </property>
    <property name="shortcut">
-    <string>Ctrl+I</string>
+    <string>Ctrl+L</string>
    </property>
   </action>
   <action name="action_open_detection">
@@ -1378,7 +1419,7 @@
   </action>
   <action name="action_set_wkdir">
    <property name="text">
-    <string>Init WKDIR</string>
+    <string>Set WKDIR</string>
    </property>
    <property name="shortcut">
     <string>Ctrl+K</string>
@@ -1393,6 +1434,22 @@
    </property>
    <property name="menuRole">
     <enum>QAction::NoRole</enum>
+   </property>
+  </action>
+  <action name="action_save_config">
+   <property name="text">
+    <string>Save configuration</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+J</string>
+   </property>
+  </action>
+  <action name="action_load_config">
+   <property name="text">
+    <string>Load configuration</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+I</string>
    </property>
   </action>
  </widget>

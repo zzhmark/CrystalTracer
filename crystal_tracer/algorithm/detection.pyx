@@ -51,12 +51,14 @@ cpdef frame_detection(cnp.ndarray gfp, cnp.ndarray bf, int thr_blk_sz=31, int to
     dt = gwdt(fgnd_img, structure)
     y, x, regs = find_maxima(dt, find_local_maxima(dt), tolerance)
     rad = radius_estimate(fgnd_img, y, x, cutoff_ratio=cutoff_ratio, bg_thr=bg_thr)
-    new_y, new_x, new_rad, area, ys_list, xs_list, masks = \
-        contour_estimate(gfp, bf, y, x, rad, shift, dog_sigma,
-                         sobel_sigma, bf_weight, gfp_weight, dilation_radius) if active_contour else \
+    if active_contour:
+        new_y, new_x, new_rad, area, ys_list, xs_list, masks = \
+            contour_estimate(gfp, bf, y, x, rad, shift, dog_sigma, sobel_sigma, bf_weight, gfp_weight, dilation_radius)
+    else:
+        new_y, new_x, new_rad, area, ys_list, xs_list, masks = \
             flood_estimate(fgnd_img, y, x, rad, cutoff_ratio=cutoff_ratio)
     return pd.DataFrame(
-        {'y': new_y, 'x': new_x, 'radius': new_rad, 'area': area, 'y_start': ys_list, 'x_start': xs_list}), masks
+            {'y': new_y, 'x': new_x, 'radius': new_rad, 'area': area, 'y_start': ys_list, 'x_start': xs_list}), masks
 
 
 @cython.boundscheck(False)
@@ -106,7 +108,7 @@ cpdef contour_estimate(cnp.ndarray gfp, cnp.ndarray bf, const vector[int]& y, co
             y_, x_ = np.nonzero(ls)
             new_y.push_back(y_.mean() + ys)
             new_x.push_back(x_.mean() + xs)
-    return new_y, new_x, new_rad, area, ys_list, xs_list, masks
+    return new_y, new_x, new_rad, area_list, ys_list, xs_list, masks
 
 
 @cython.boundscheck(False)
@@ -161,7 +163,7 @@ cpdef radius_estimate(cnp.ndarray[cnp.uint8_t, ndim=2] img, const vector[int]& y
 @cython.wraparound(False)
 @cython.nonecheck(False)
 cpdef flood_estimate(cnp.ndarray[cnp.uint8_t, ndim=2] img, const vector[int]& y, const vector[int]& x,
-                     const vector[int]& rad, float cutoff_ratio=0.5, float lowest_cutoff=0):
+                     const vector[int]& rad, float cutoff_ratio=0.5, float lowest_cutoff=0, float enlargement=2):
     """
     Measure crystal sizes by flooding, based on radius estimate results.
     :param img: input fluorescent image
@@ -170,10 +172,11 @@ cpdef flood_estimate(cnp.ndarray[cnp.uint8_t, ndim=2] img, const vector[int]& y,
     :param rad: radii of the candidate crystals
     :param cutoff_ratio: the ratio between the seed intensity and background
     :param lowest_cutoff: the cutoff should be more than this
+    :param enlargement: the enlargement of the window based on the radius
     :return:
     """
     cdef:
-        int i, j, k, ys, xs, ye, se, height, width, area
+        int i, j, k, ys, xs, ye, se, height, width, area, r
         float thr
         cnp.ndarray[cnp.int32_t, ndim=2] flood
         vector[float] new_y, new_x
@@ -184,16 +187,17 @@ cpdef flood_estimate(cnp.ndarray[cnp.uint8_t, ndim=2] img, const vector[int]& y,
         list masks = []
 
     for i in range(y.size()):
-        ys = max(0, y[i] - rad[i] * 2)
-        xs = max(0, x[i] - rad[i] * 2)
-        ye = min(img.shape[0], y[i] + rad[i] * 2)
-        xe = min(img.shape[1], x[i] + rad[i] * 2)
+        r = <int>(rad[i] * enlargement)
+        ys = max(0, y[i] - r)
+        xs = max(0, x[i] - r)
+        ye = min(img.shape[0], y[i] + r)
+        xe = min(img.shape[1], x[i] + r)
         height = ye - ys
         width = xe - xs
         crop = img[ys:ye, xs:xe]
         flood = np.zeros_like(crop, dtype=int)
         t = y[i] - ys, x[i] - xs
-        cv2.circle(flood, (x[i] - xs, y[i] - ys), int(rad[i]), 1, -1)
+        cv2.circle(flood, (x[i] - xs, y[i] - ys), r, 1, -1)
         que.push(t)
         thr = crop[t.first, t.second] * cutoff_ratio
         if lowest_cutoff > thr:
@@ -217,6 +221,6 @@ cpdef flood_estimate(cnp.ndarray[cnp.uint8_t, ndim=2] img, const vector[int]& y,
         new_y.push_back(y[i])
         new_x.push_back(x[i])
         new_rad.push_back(rad[i])
-    return new_y, new_x, new_rad, area, ys_list, xs_list, masks
+    return new_y, new_x, new_rad, area_list, ys_list, xs_list, masks
 
 

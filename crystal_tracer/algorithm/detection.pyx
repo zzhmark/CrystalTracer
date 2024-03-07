@@ -52,13 +52,22 @@ cpdef frame_detection(cnp.ndarray gfp, cnp.ndarray bf, int thr_blk_sz=31, int to
     y, x, regs = find_maxima(dt, find_local_maxima(dt), tolerance)
     rad = radius_estimate(fgnd_img, y, x, cutoff_ratio=cutoff_ratio, bg_thr=bg_thr)
     if active_contour:
-        new_y, new_x, new_rad, area, ys_list, xs_list, masks = \
+        area, ys_list, xs_list, masks = \
             contour_estimate(gfp, bf, y, x, rad, shift, dog_sigma, sobel_sigma, bf_weight, gfp_weight, dilation_radius)
     else:
-        new_y, new_x, new_rad, area, ys_list, xs_list, masks = \
+        area, ys_list, xs_list, masks = \
             flood_estimate(fgnd_img, y, x, rad, cutoff_ratio=cutoff_ratio)
-    return pd.DataFrame(
-            {'y': new_y, 'x': new_x, 'radius': new_rad, 'area': area, 'y_start': ys_list, 'x_start': xs_list}), masks
+
+    cdef vector[float] new_y, new_x, intensity_list
+    for ys, xs, mask in zip(ys_list, xs_list, masks):
+        y_, x_ = np.nonzero(mask)
+        new_y.push_back(y_.mean() + ys)
+        new_x.push_back(x_.mean() + xs)
+        h, w = mask.shape
+        intensity_list.push_back(gfp[ys:ys+h, xs:xs+w][mask > 0].mean())
+
+    return pd.DataFrame({'y': new_y, 'x': new_x, 'area': area, 'intensity': intensity_list,
+                         'y_start': ys_list, 'x_start': xs_list}), masks
 
 
 @cython.boundscheck(False)
@@ -70,8 +79,7 @@ cpdef contour_estimate(cnp.ndarray gfp, cnp.ndarray bf, const vector[int]& y, co
     cdef:
         int i, win_rad, ys, xs, ye, xe, area, height = gfp.shape[0], width = gfp.shape[1]
         cnp.ndarray[cnp.float32_t, ndim=2] edges
-        vector[float] new_y, new_x
-        vector[int] new_rad, ys_list, xs_list, area_list
+        vector[int] ys_list, xs_list, area_list
         cnp.ndarray[cnp.int64_t, ndim=1] x_, y_
         cnp.ndarray[cnp.uint8_t, ndim=2] ls
         list masks = []
@@ -103,12 +111,9 @@ cpdef contour_estimate(cnp.ndarray gfp, cnp.ndarray bf, const vector[int]& y, co
             ys_list.push_back(ys)
             xs_list.push_back(xs)
             area_list.push_back(area)
-            new_rad.push_back(rad[i])
             masks.append(ls)
             y_, x_ = np.nonzero(ls)
-            new_y.push_back(y_.mean() + ys)
-            new_x.push_back(x_.mean() + xs)
-    return new_y, new_x, new_rad, area_list, ys_list, xs_list, masks
+    return area_list, ys_list, xs_list, masks
 
 
 @cython.boundscheck(False)
@@ -179,8 +184,7 @@ cpdef flood_estimate(cnp.ndarray[cnp.uint8_t, ndim=2] img, const vector[int]& y,
         int i, j, k, ys, xs, ye, se, height, width, area, r
         float thr
         cnp.ndarray[cnp.int32_t, ndim=2] flood
-        vector[float] new_y, new_x
-        vector[int] area_list, ys_list, xs_list, new_rad
+        vector[int] area_list, ys_list, xs_list
         vector[pair[int, int]] shift = [(1, 0), (-1, 0), (0, 1), (0, -1)]
         queue[pair[int, int]] que
         pair[int, int] t, tt
@@ -214,13 +218,11 @@ cpdef flood_estimate(cnp.ndarray[cnp.uint8_t, ndim=2] img, const vector[int]& y,
                     flood[tt.first, tt.second] = 255
             que.pop()
         flood[flood == 1] = 0
+        y_, x_ = np.nonzero(flood)
         masks.append(flood.astype(np.uint8))
         area_list.push_back(area)
         ys_list.push_back(ys)
         xs_list.push_back(xs)
-        new_y.push_back(y[i])
-        new_x.push_back(x[i])
-        new_rad.push_back(rad[i])
-    return new_y, new_x, new_rad, area_list, ys_list, xs_list, masks
+    return area_list, ys_list, xs_list, masks
 
 

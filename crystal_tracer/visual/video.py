@@ -27,7 +27,7 @@ def make_video(track: list[tuple[int, int]], save_path: Path, czi_path: Path, ta
     last = None
     tot, c, height, width = get_czi_shape(czi_path)
     for i, j in track:
-        ys_old, xs_old = pd.read_csv(table_paths[i]).loc[j, ['y_start', 'x_start']].values.astype(int).ravel()
+        ys_old, xs_old, intensity = pd.read_csv(table_paths[i]).loc[j, ['y_start', 'x_start', 'intensity']].values.astype(int).ravel()
         mask = np.load(mask_paths[i])[f'arr_{j}']
         size_y, size_x = mask.shape
         cty, ctx = ys_old + size_y // 2, xs_old + size_x // 2
@@ -40,8 +40,9 @@ def make_video(track: list[tuple[int, int]], save_path: Path, czi_path: Path, ta
         y_ = np.clip(y_, 0, height - 1)
         x_ = np.clip(x_, 0, width - 1)
         new_mask[(y_, x_)] = 1
-        img = load_czi_slice(czi_path, 0, i)
-        img = cv2.normalize(img[ys: ye, xs: xe], None, 0, 255, cv2.NORM_MINMAX, cv2.CV_8U)
+        img = load_czi_slice(czi_path, 0, i)[ys: ye, xs: xe]
+        img = img.clip(None, intensity * 2) / (intensity * 2)
+        img = cv2.normalize(img, None, 0, 255, cv2.NORM_MINMAX, cv2.CV_8U)
         img = draw_contour(img, new_mask)
         for k in range(1 if last is None else i - last):
             writer.write(img)

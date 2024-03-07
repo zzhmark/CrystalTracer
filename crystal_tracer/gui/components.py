@@ -54,7 +54,7 @@ class AnimatedFigureComponent(FigureComponent):
         self.ax.set(zlim3d=(0, len(timescale) - 1), zlabel='Timestamp')
 
         self.ani = animation.FuncAnimation(
-            self.fig, self.update_plot, len(timescale), interval=25, repeat=False)
+            self.fig, self.update_plot, len(timescale), interval=1, repeat=True)
         self.canvas.draw()
 
     def update_plot(self, num):

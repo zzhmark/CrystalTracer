@@ -2,7 +2,7 @@ import pandas as pd
 from PySide6.QtCore import QThread, Signal
 from crystal_tracer.img_utils import load_czi_slice
 from crystal_tracer.algorithm.detection import frame_detection
-from crystal_tracer.algorithm.tracking import independent_match
+from crystal_tracer.algorithm.tracking import independent_match, linear_programming
 from crystal_tracer.visual.video import make_video
 from crystal_tracer.visual.draw import draw_patches
 import matplotlib.animation as animation
@@ -70,8 +70,9 @@ class TrackingTask(QThread):
         self.table_paths = table_paths
         self.save_path = save_path
         self.args = args
+        self.tables = None
 
-    def run(self):
+    def _load(self):
         async def async_read_csv(path):
             async with aiofiles.open(path, 'r') as f:
                 content = await f.read()
@@ -81,8 +82,19 @@ class TrackingTask(QThread):
             coroutines = [async_read_csv(path) for path in self.table_paths]
             return await asyncio.gather(*coroutines)
 
-        tables = asyncio.run(load_all_tables())
-        tracks = independent_match(tables, *self.args, callback=self.increment.emit)
+        self.tables = list(asyncio.run(load_all_tables()))
+
+    def run(self):
+        self._load()
+        tracks = independent_match(self.tables, *self.args, callback=self.increment.emit)
+        with open(self.save_path, 'wb') as f:
+            pickle.dump(tracks, f)
+
+
+class TrackingTask2(TrackingTask):
+    def run(self):
+        self._load()
+        tracks = linear_programming(self.tables, *self.args, callback=self.increment.emit)
         with open(self.save_path, 'wb') as f:
             pickle.dump(tracks, f)
 
@@ -121,6 +133,7 @@ def plot_area(path, track, tables, max_area=500):
 
     ani = animation.FuncAnimation(fig, animate, len(time_interp), init, interval=20, blit=True, repeat=False)
     ani.save(path.with_suffix('.mp4'), writer='ffmpeg')
+    fig.savefig(path.with_suffix('.png'), dpi=300)
     plt.close(fig)
 
 

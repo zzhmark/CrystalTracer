@@ -3,6 +3,8 @@ from sklearn.neighbors import KDTree
 import numpy as np
 from tqdm import tqdm
 from sklearn.linear_model import LinearRegression
+from math import sqrt, atan2, pi
+from scipy.optimize import linear_sum_assignment
 
 
 class Predictor:
@@ -30,83 +32,103 @@ class Predictor:
             return self._mod
 
 
-def independent_match(tables, dist_thr=30, nn=5, time_gap_thr=10, min_sampling_count=10, min_sampling_elapse=100,
-                      max_area_overflow=.2, max_area_diff=25., position_sampling_count=3, callback=None):
+def angle_dist(center, other):
+    vec = other - center
+    dist = np.linalg.norm(vec, axis=-1)
+    angle = np.array([atan2(v[0], v[1]) for v in vec])
+    order = np.argsort(angle)
+    return dist[order], angle[order]
+
+
+def neighborhood_match(center, other, centers, others):
+    dist, rad = angle_dist(center, other)
+    scores = []
+    for c, o in zip(centers, others):
+        d, r = angle_dist(c, o)
+        diff_r = abs(np.subtract.outer(rad, r))
+        diff_r = np.clip(diff_r, None, 2 * pi - diff_r)
+        diff_d = abs(np.subtract.outer(dist, d))
+        diff = diff_d * diff_r
+        choice = linear_sum_assignment(diff)
+        scores.append(diff[choice].sum())
+    return scores
+
+
+def independent_match(tables: list[pd.DataFrame], area_normalizer=500., nn=5, time_gap_thr=5, min_sampling_count=5,
+                      min_sampling_elapse=10,
+                      max_area_overflow=.25, max_intensity_overflow=.25, callback=None):
     """
     Connect the crystals in each frame in and independent manner, starting from the last frame. It forms a track for
     each crystal in the last frame until it disappears in reverse time order. The output will be reversed back.
 
     :param tables: a list of dataframes of detected crystals
-    :param dist_thr: the radius range for match the crystal
+    :param area_normalizer: the distance threshold controller
     :param nn: number of nearest neighboring crystals considered for matching
     :param time_gap_thr: max time gap allowed in the track
     :param min_sampling_count: min No. of sampling points for area fitting
     :param min_sampling_elapse: min time elapse of sampling points for area fitting
     :param max_area_overflow: the max ratio of area difference
-    :param max_area_diff: the max exact area difference in pixel
-    :param position_sampling_count: the number of points for fitting crystal position
+    :param max_intensity_overflow: the max ratio of intensity difference
     :param callback: a function to call in each iteration
     :return: identified tracks, a list of lists of tuples, (frame, index)
     """
 
     # init from the last frame
     # chains: the tracks. list of (frame, crystal_id)
-    # prev_pos: previous crystal position
     # pred_area: predicted area based on previous discovery
+    nn += 1
     tracks = []
     pred_area = []
-    pred_pos = []
+    pred_gray = []
+    trees = [KDTree(t[['y', 'x']]) for t in tables]
     for ind, row in tables[-1].iterrows():
         tracks.append([(len(tables) - 1, ind)])
         # init as the start crystal size
         pred_area.append(Predictor(min_sampling_count, min_sampling_elapse).fit([0], [row['area']]))
-        pred_pos.append(Predictor().fit([0], [[row['y'], row['x']]]))
+        pred_gray.append(Predictor().fit([0], [row['intensity']]))
 
     callback()
     # start tracking from the one but last frame
-    for i_frame in tqdm(range(len(tables) - 1 , -1, -1)):
-        # the position of the expected position of each track in this frame predicted by a linear model
-        expect_pos = np.array([p.predict(i_frame) for p in pred_pos])
-        expect_tree = KDTree(expect_pos)
-        # the assignment of detections to tracks has a priority
-        # the detections with less competition is considered first
-        # measured by the distance to their nearest neighbour
+    for i_frame in tqdm(range(len(tables) - 2 , -1, -1)):
         cur_pos = tables[i_frame][['y', 'x']].to_numpy()
-        cur_tree = KDTree(cur_pos)  # kdtree based on detections of current frame
-
-        # based on previous track ends, find the candidate crystals within a radius
-        candidate_crystals = cur_tree.query_radius(expect_pos, dist_thr)
-
-        # the features and indices of features of the current pos
-        # this is for reference to calculate the priority
-        ref_features, ref_features_ind = expect_tree.query(expect_pos, nn, dualtree=True)
+        n = min(nn, len(cur_pos))
+        cur_ind = trees[i_frame].query(cur_pos, n, dualtree=True, return_distance=False)
 
         # check for each crystal which track can be appended to
-        for track, mod_area, mod_pos, i_crystals, ref_vec, ref_ind \
-                in zip(tracks, pred_area, pred_pos, candidate_crystals, ref_features, ref_features_ind):
+        for track, mod_area, mod_gray in zip(tracks, pred_area, pred_gray):
+
             # these tracks are terminated for big time gap
             if track[-1][0] - i_frame > time_gap_thr:
                 continue
 
-            # estimate the area for this frame
+            i_frame_last, i_crystal_last = track[-1]
+            center = tables[i_frame_last].loc[i_crystal_last, ['y', 'x']].to_numpy()
             ref_area = mod_area.predict(i_frame)
-            i_crystals = i_crystals[np.abs(tables[i_frame].loc[i_crystals, 'area'].to_numpy() - ref_area) <
-                                    min(max_area_overflow * ref_area, max_area_diff)]
+            dist_thr = area_normalizer / sqrt(ref_area)
+            i_crystals = trees[i_frame].query_radius([center], dist_thr)[0]
+
+            # estimate the area for this frame
+            scale = sqrt(area_normalizer / ref_area)
+            i_crystals = i_crystals[np.abs(ref_area - tables[i_frame].loc[i_crystals, 'area'].to_numpy()) <
+                                    max_area_overflow * scale * ref_area]
+            ref_gray = mod_gray.predict(i_frame)
+            i_crystals = i_crystals[np.abs(tables[i_frame].loc[i_crystals, 'intensity'].to_numpy() - ref_gray) <
+                                    max_intensity_overflow * scale * ref_gray]
 
             if len(i_crystals) == 0:
                 continue
 
-            cand_vec = [np.linalg.norm(cur_pos[i] - expect_pos[ref_ind], axis=1) for i in i_crystals]
-            # most similar in neighborhood
-            best_match = i_crystals[np.argmin(np.linalg.norm(cand_vec - ref_vec, axis=1))]
+            ind = trees[i_frame_last].query([center], n, return_distance=False)[0][1:]
+            ans = neighborhood_match(center, tables[i_frame_last].loc[ind, ['y', 'x']].to_numpy(),
+                                     tables[i_frame].loc[i_crystals, ['y', 'x']].to_numpy(),
+                                     [tables[i_frame].loc[cur_ind[i][1:], ['y', 'x']].to_numpy() for i in i_crystals])
 
             # update track if time gap is met
-            track.append((i_frame, best_match))
+            track.append((i_frame, i_crystals[np.argmin(ans)]))
 
             # update area prediction
             mod_area.fit([c[0] for c in track], [tables[c[0]].at[c[1], 'area'] for c in track])
-            mod_pos.fit([c[0] for c in track], [tables[c[0]].loc[c[1], ['y', 'x']].to_numpy()
-                                                for c in track[-position_sampling_count:]])
+            mod_gray.fit([c[0] for c in track], [tables[c[0]].at[c[1], 'intensity'] for c in track])
 
         if callback is not None:
             callback()
@@ -114,4 +136,114 @@ def independent_match(tables, dist_thr=30, nn=5, time_gap_thr=10, min_sampling_c
     for t in tracks:
         t.reverse()
 
+    return tracks
+
+
+def ratio_diff(a, b):
+    t = a / b
+    return (t + 1 / t) / 2
+
+
+def linear_programming(tables, area_normalizer=500., nn=10, time_gap_thr=10, min_sampling_count=5, min_sampling_elapse=10,
+                       max_area_overflow=.25, max_intensity_overflow=.25, w_dist=1., w_area=1., w_intensity=1., w_local=1.,
+                       callback=None):
+    """
+    Connect the crystals in each frame in and independent manner, starting from the last frame. It forms a track for
+    each crystal in the last frame until it disappears in reverse time order. The output will be reversed back.
+
+    :param tables: a list of dataframes of detected crystals
+    :param area_normalizer: the distance threshold
+    :param nn: number of nearest neighboring crystals considered for matching
+    :param time_gap_thr: max time gap allowed in the track
+    :param min_sampling_count: min No. of sampling points for area fitting
+    :param min_sampling_elapse: min time elapse of sampling points for area fitting
+    :param max_area_overflow: the max ratio of area difference
+    :param max_intensity_overflow: the max ratio of intensity difference
+    :return: identified tracks, a list of lists of tuples, (frame, index)
+    """
+
+    def cost(v1, v2):
+        p1 = v1[:2]
+        p2 = v2[:2]
+        dist = np.linalg.norm(p1 - p2)
+        area_diff = abs(v1[2] - v2[2])
+        gray_diff = abs(v1[3] - v2[3])
+        v1 = v1[4:].reshape(-1, 2)
+        v2 = v2[4:].reshape(-1, 2)
+        local_score = neighborhood_match(p1, v1, [p2], [v2])[0]
+        return w_dist*dist + w_area*area_diff + w_intensity*gray_diff + w_local*local_score
+
+    cost_func = np.vectorize(cost, signature='(n),(n)->()')
+
+    nn += 1
+
+    # init from the last frame
+    # chains: the tracks. list of (frame, crystal_id)
+    # pred_area: predicted area based on previous discovery
+    tracks = []
+    pred_area = []
+    pred_gray = []
+    trees = [KDTree(t[['y', 'x']]) for t in tables]
+    for ind, row in tables[-1].iterrows():
+        tracks.append([(len(tables) - 1, ind)])
+        # init as the start crystal size
+        pred_area.append(Predictor(min_sampling_count, min_sampling_elapse).fit([0], [row['area']]))
+        pred_gray.append(Predictor().fit([0], [row['intensity']]))
+
+    # start tracking from the one but last frame
+    for i_frame in tqdm(range(len(tables) - 2 , -1, -1)):
+        if callback is not None:
+            callback()
+        cur_features = tables[i_frame][['y', 'x', 'area', 'intensity']].to_numpy()
+        n = min(nn, len(cur_features))
+        cur_ind = trees[i_frame].query(cur_features[:, :2], n, dualtree=True, return_distance=False)
+        cur_pos = np.array([cur_features[i[1:], :2] for i in cur_ind]).reshape(cur_ind.shape[0], -1)
+        cur_features = np.concatenate([cur_features, cur_pos], axis=1)
+
+        active = []
+        pre_features = []
+        for t, mod_area, mod_gray in zip(tracks, pred_area, pred_gray):
+            i_frame_last, i_crystal_last = t[-1]
+            if i_frame_last - i_frame > time_gap_thr:
+                continue
+            active.append(t)
+            feature = tables[i_frame_last].loc[i_crystal_last, ['y', 'x']].to_list()
+            prev_ind = trees[i_frame_last].query([feature], n, return_distance=False)[0][1:]
+            prev_pos = tables[i_frame_last].loc[prev_ind, ['y', 'x']].to_numpy().reshape(-1)
+            feature.append(mod_area.predict(i_frame))
+            feature.append(mod_gray.predict(i_frame))
+            feature.extend(list(prev_pos))
+            pre_features.append(feature)
+        if len(active) == 0:
+            continue
+        pre_features = np.array(pre_features)
+
+        # linear programming
+        mat = cost_func(pre_features.reshape(-1, 1, pre_features.shape[1]),
+                        cur_features.reshape(1, -1, cur_features.shape[1]))
+        choice = linear_sum_assignment(mat)
+
+        for t, c, mod_area, mod_gray, f1 in zip(active, choice[1], pred_area, pred_gray, pre_features):
+            # update tracks and models
+            coord = f1[:2]
+            ref_area = f1[2]
+            ref_gray = f1[3]
+            dist_thr = area_normalizer / sqrt(ref_area)
+            f2 = cur_features[c]
+            cur_coord = f2[:2]
+            cur_area = f2[2]
+            cur_gray = f2[3]
+            scale = sqrt(area_normalizer / ref_area)
+            if np.linalg.norm(coord - cur_coord) > dist_thr or \
+                    abs(ref_area - cur_area) > max_area_overflow * scale * ref_area or \
+                    abs(cur_gray - ref_gray) > max_intensity_overflow * scale * ref_gray:
+                continue
+            t.append((i_frame, c))
+            mod_area.fit([c[0] for c in t], [tables[c[0]].at[c[1], 'area'] for c in t])
+            mod_gray.fit([c[0] for c in t], [tables[c[0]].at[c[1], 'intensity'] for c in t])
+
+    for t in tracks:
+        t.reverse()
+
+    callback()
     return tracks

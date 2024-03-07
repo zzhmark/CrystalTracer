@@ -9,6 +9,6 @@ if __name__ == '__main__':
     frames = [pd.read_csv(df_folder / f"{i}.csv") for i in range(len([*df_folder.glob('*.csv')]))]
     for f in frames:
         f['area'] = math.pi * f['radius']**2
-    res = independent_match(frames, dist_thr=5, nn=10)
+    res = independent_match(frames, area_normalizer=5, nn=10)
     with open('../../data/case2/traces.pickle', 'wb') as f:
         pickle.dump(res, f)

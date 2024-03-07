@@ -8,7 +8,8 @@ from PySide6.QtCore import Slot, QThread, Qt
 from PySide6.QtWidgets import QApplication, QMainWindow, QButtonGroup, QFileDialog, QMessageBox, QProgressDialog
 from crystal_tracer.gui.ui_loader import loadUi
 from crystal_tracer.img_utils import load_czi_slice, get_czi_shape
-from crystal_tracer.gui.workers import PreviewRunner, DetectionTask, TrackingTask, RecordingTask, WalkRunner
+from crystal_tracer.gui.workers import PreviewRunner, DetectionTask, TrackingTask, \
+    RecordingTask, WalkRunner, TrackingTask2
 from crystal_tracer.gui.components import FigureComponent, AnimatedFigureComponent
 
 
@@ -156,14 +157,17 @@ class CrystalTracerApp(QMainWindow):
             self.dilation_radius.setValue(int(section['dilation_radius']))
         if config.has_section('parameters.tracking'):
             section = config['parameters.tracking']
-            self.dist_thr.setValue(float(section['dist_thr'])),
+            self.area_norm.setValue(float(section['area_norm'])),
             self.nn.setValue(int(section['nn'])),
             self.time_gap.setValue(int(section['time_gap'])),
             self.min_sampling_count.setValue(int(section['min_sampling_count'])),
             self.min_sampling_elapse.setValue(int(section['min_sampling_elapse'])),
             self.area_overflow.setValue(float(section['area_overflow'])),
-            self.area_diff.setValue(float(section['area_diff'])),
-            self.pos_sampling_count.setValue(int(section['pos_sampling_count']))
+            self.intensity_overflow.setValue(float(section['intensity_overflow'])),
+            self.w_dist.setValue(float(section['w_dist'])),
+            self.w_area.setValue(float(section['w_area'])),
+            self.w_intensity.setValue(float(section['w_intensity'])),
+            self.w_local.setValue(float(section['w_local'])),
         self._config_path = Path(path)
 
     @Slot()
@@ -220,14 +224,17 @@ class CrystalTracerApp(QMainWindow):
             'dilation_radius': self.dilation_radius.value()
         }
         config['parameters.tracking'] = {
-            'dist_thr': self.dist_thr.value(),
+            'area_norm': self.area_norm.value(),
             'nn': self.nn.value(),
             'time_gap': self.time_gap.value(),
             'min_sampling_count': self.min_sampling_count.value(),
             'min_sampling_elapse': self.min_sampling_elapse.value(),
             'area_overflow': self.area_overflow.value(),
-            'area_diff': self.area_diff.value(),
-            'pos_sampling_count': self.pos_sampling_count.value()
+            'intensity_overflow': self.intensity_overflow.value(),
+            'w_dist': self.w_dist.value(),
+            'w_area': self.w_area.value(),
+            'w_intensity': self.w_intensity.value(),
+            'w_local': self.w_local.value(),
         }
         with open(path, 'w', encoding='utf-8') as f:
             config.write(f)
@@ -419,10 +426,18 @@ class CrystalTracerApp(QMainWindow):
         self.setEnabled(False)
         self.tracking_progress.setMaximum(len(self._table_paths))
         self.tracking_progress.setValue(0)
-        self.task = TrackingTask(self._table_paths, p, self.dist_thr.value(), self.nn.value(),
-                                 self.time_gap.value(), self.min_sampling_count.value(),
-                                 self.min_sampling_elapse.value(), self.area_overflow.value(), self.area_diff.value(),
-                                 self.pos_sampling_count.value())
+        if self.track_algorithms.currentIndex() == 0:
+            self.task = TrackingTask(self._table_paths, p, self.area_norm.value(), self.nn.value(),
+                                     self.time_gap.value(), self.min_sampling_count.value(),
+                                     self.min_sampling_elapse.value(), self.area_overflow.value(),
+                                     self.intensity_overflow.value())
+        else:
+            self.task = TrackingTask2(self._table_paths, p, self.area_norm.value(), self.nn.value(),
+                                      self.time_gap.value(), self.min_sampling_count.value(),
+                                      self.min_sampling_elapse.value(),
+                                      self.area_overflow.value(), self.intensity_overflow.value(),
+                                      self.w_dist.value(), self.w_area.value(), self.w_intensity.value(),
+                                      self.w_local.value())
         self.task.increment.connect(self.increment_tracking_progress)
         self.task.finished.connect(self.after_tracking)
         self.task.start()
@@ -436,6 +451,7 @@ class CrystalTracerApp(QMainWindow):
         print('Tracking task done.')
         self.task = None
         self.load_tracking(self.save_path_tracking.text())
+        self.on_visualize_tracks()
         self.setEnabled(True)
 
     @Slot()

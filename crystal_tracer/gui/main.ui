@@ -490,7 +490,7 @@
                   <number>1000</number>
                  </property>
                  <property name="value">
-                  <number>100</number>
+                  <number>20</number>
                  </property>
                 </widget>
                </item>
@@ -878,18 +878,24 @@
                  <string>Linear Programming</string>
                 </attribute>
                 <layout class="QGridLayout" name="gridLayout_4">
-                 <item row="6" column="0">
-                  <widget class="QLabel" name="label_33">
-                   <property name="toolTip">
-                    <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Max allowed area change in ratio, to keep the area change stable. The reference area is predicted linearly.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                 <item row="2" column="1">
+                  <widget class="QSpinBox" name="time_gap_slave">
+                   <property name="sizePolicy">
+                    <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
+                     <horstretch>0</horstretch>
+                     <verstretch>0</verstretch>
+                    </sizepolicy>
                    </property>
-                   <property name="text">
-                    <string>max area overflow</string>
+                   <property name="alignment">
+                    <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+                   </property>
+                   <property name="value">
+                    <number>2</number>
                    </property>
                   </widget>
                  </item>
-                 <item row="17" column="1">
-                  <widget class="QDoubleSpinBox" name="w_local">
+                 <item row="15" column="1">
+                  <widget class="QDoubleSpinBox" name="w_intensity">
                    <property name="alignment">
                     <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
                    </property>
@@ -904,41 +910,13 @@
                    </property>
                   </widget>
                  </item>
-                 <item row="5" column="1">
-                  <widget class="QSpinBox" name="min_sampling_elapse_slave">
-                   <property name="sizePolicy">
-                    <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
-                     <horstretch>0</horstretch>
-                     <verstretch>0</verstretch>
-                    </sizepolicy>
+                 <item row="7" column="0">
+                  <widget class="QLabel" name="label_32">
+                   <property name="toolTip">
+                    <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Max allowed intensity change in ratio, to keep the crystal intensity stable. The reference intensity is predicted linearly.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
                    </property>
-                   <property name="alignment">
-                    <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
-                   </property>
-                   <property name="minimum">
-                    <number>1</number>
-                   </property>
-                   <property name="maximum">
-                    <number>1000</number>
-                   </property>
-                   <property name="value">
-                    <number>10</number>
-                   </property>
-                  </widget>
-                 </item>
-                 <item row="6" column="1">
-                  <widget class="QDoubleSpinBox" name="area_overflow_slave">
-                   <property name="alignment">
-                    <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
-                   </property>
-                   <property name="maximum">
-                    <double>1.000000000000000</double>
-                   </property>
-                   <property name="stepType">
-                    <enum>QAbstractSpinBox::AdaptiveDecimalStepType</enum>
-                   </property>
-                   <property name="value">
-                    <double>0.250000000000000</double>
+                   <property name="text">
+                    <string>max intensity overflow</string>
                    </property>
                   </widget>
                  </item>
@@ -950,29 +928,6 @@
                      <verstretch>0</verstretch>
                     </sizepolicy>
                    </property>
-                   <property name="alignment">
-                    <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
-                   </property>
-                   <property name="minimum">
-                    <number>1</number>
-                   </property>
-                   <property name="value">
-                    <number>5</number>
-                   </property>
-                  </widget>
-                 </item>
-                 <item row="1" column="0">
-                  <widget class="QLabel" name="label_35">
-                   <property name="toolTip">
-                    <string>the number of neighboring crystals considered for matching</string>
-                   </property>
-                   <property name="text">
-                    <string>number of neighbours</string>
-                   </property>
-                  </widget>
-                 </item>
-                 <item row="1" column="1">
-                  <widget class="QSpinBox" name="nn_slave">
                    <property name="alignment">
                     <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
                    </property>
@@ -1000,6 +955,119 @@
                    </property>
                   </widget>
                  </item>
+                 <item row="6" column="0">
+                  <widget class="QLabel" name="label_33">
+                   <property name="toolTip">
+                    <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Max allowed area change in ratio, to keep the area change stable. The reference area is predicted linearly.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                   </property>
+                   <property name="text">
+                    <string>max area overflow</string>
+                   </property>
+                  </widget>
+                 </item>
+                 <item row="17" column="1">
+                  <widget class="QDoubleSpinBox" name="w_local">
+                   <property name="alignment">
+                    <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+                   </property>
+                   <property name="maximum">
+                    <double>1000.000000000000000</double>
+                   </property>
+                   <property name="stepType">
+                    <enum>QAbstractSpinBox::AdaptiveDecimalStepType</enum>
+                   </property>
+                   <property name="value">
+                    <double>1.000000000000000</double>
+                   </property>
+                  </widget>
+                 </item>
+                 <item row="6" column="1">
+                  <widget class="QDoubleSpinBox" name="area_overflow_slave">
+                   <property name="alignment">
+                    <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+                   </property>
+                   <property name="maximum">
+                    <double>1.000000000000000</double>
+                   </property>
+                   <property name="stepType">
+                    <enum>QAbstractSpinBox::AdaptiveDecimalStepType</enum>
+                   </property>
+                   <property name="value">
+                    <double>0.250000000000000</double>
+                   </property>
+                  </widget>
+                 </item>
+                 <item row="9" column="1">
+                  <widget class="QDoubleSpinBox" name="w_dist">
+                   <property name="alignment">
+                    <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+                   </property>
+                   <property name="maximum">
+                    <double>1000.000000000000000</double>
+                   </property>
+                   <property name="stepType">
+                    <enum>QAbstractSpinBox::AdaptiveDecimalStepType</enum>
+                   </property>
+                   <property name="value">
+                    <double>1.000000000000000</double>
+                   </property>
+                  </widget>
+                 </item>
+                 <item row="1" column="0">
+                  <widget class="QLabel" name="label_35">
+                   <property name="toolTip">
+                    <string>the number of neighboring crystals considered for matching</string>
+                   </property>
+                   <property name="text">
+                    <string>number of neighbours</string>
+                   </property>
+                  </widget>
+                 </item>
+                 <item row="13" column="1">
+                  <widget class="QDoubleSpinBox" name="w_area">
+                   <property name="alignment">
+                    <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+                   </property>
+                   <property name="maximum">
+                    <double>1000.000000000000000</double>
+                   </property>
+                   <property name="stepType">
+                    <enum>QAbstractSpinBox::AdaptiveDecimalStepType</enum>
+                   </property>
+                   <property name="value">
+                    <double>1.000000000000000</double>
+                   </property>
+                  </widget>
+                 </item>
+                 <item row="7" column="1">
+                  <widget class="QDoubleSpinBox" name="intensity_overflow_slave">
+                   <property name="alignment">
+                    <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+                   </property>
+                   <property name="maximum">
+                    <double>1.000000000000000</double>
+                   </property>
+                   <property name="stepType">
+                    <enum>QAbstractSpinBox::AdaptiveDecimalStepType</enum>
+                   </property>
+                   <property name="value">
+                    <double>0.250000000000000</double>
+                   </property>
+                  </widget>
+                 </item>
+                 <item row="1" column="1">
+                  <widget class="QSpinBox" name="nn_slave">
+                   <property name="alignment">
+                    <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+                   </property>
+                   <property name="minimum">
+                    <number>1</number>
+                   </property>
+                   <property name="value">
+                    <number>3</number>
+                   </property>
+                  </widget>
+                 </item>
                  <item row="4" column="0">
                   <widget class="QLabel" name="label_31">
                    <property name="sizePolicy">
@@ -1013,48 +1081,6 @@
                    </property>
                    <property name="text">
                     <string>min sampling count</string>
-                   </property>
-                  </widget>
-                 </item>
-                 <item row="15" column="0" rowspan="2">
-                  <widget class="QLabel" name="label_36">
-                   <property name="toolTip">
-                    <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Max allowed area change in ratio, to keep the area change stable. The reference area is predicted linearly.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-                   </property>
-                   <property name="text">
-                    <string>weight intensity</string>
-                   </property>
-                  </widget>
-                 </item>
-                 <item row="5" column="0">
-                  <widget class="QLabel" name="label_29">
-                   <property name="sizePolicy">
-                    <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
-                     <horstretch>0</horstretch>
-                     <verstretch>0</verstretch>
-                    </sizepolicy>
-                   </property>
-                   <property name="toolTip">
-                    <string>min elapse of time for area fitting</string>
-                   </property>
-                   <property name="text">
-                    <string>min sampling elapse</string>
-                   </property>
-                  </widget>
-                 </item>
-                 <item row="13" column="0" rowspan="2">
-                  <widget class="QLabel" name="label_38">
-                   <property name="sizePolicy">
-                    <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
-                     <horstretch>0</horstretch>
-                     <verstretch>0</verstretch>
-                    </sizepolicy>
-                   </property>
-                   <property name="toolTip">
-                    <string>min elapse of time for area fitting</string>
-                   </property>
-                   <property name="text">
-                    <string>weight area</string>
                    </property>
                   </widget>
                  </item>
@@ -1106,6 +1132,28 @@
                    </property>
                   </widget>
                  </item>
+                 <item row="5" column="1">
+                  <widget class="QSpinBox" name="min_sampling_elapse_slave">
+                   <property name="sizePolicy">
+                    <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
+                     <horstretch>0</horstretch>
+                     <verstretch>0</verstretch>
+                    </sizepolicy>
+                   </property>
+                   <property name="alignment">
+                    <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+                   </property>
+                   <property name="minimum">
+                    <number>1</number>
+                   </property>
+                   <property name="maximum">
+                    <number>1000</number>
+                   </property>
+                   <property name="value">
+                    <number>10</number>
+                   </property>
+                  </widget>
+                 </item>
                  <item row="17" column="0">
                   <widget class="QLabel" name="label_37">
                    <property name="toolTip">
@@ -1113,6 +1161,16 @@
                    </property>
                    <property name="text">
                     <string>weight local</string>
+                   </property>
+                  </widget>
+                 </item>
+                 <item row="15" column="0" rowspan="2">
+                  <widget class="QLabel" name="label_36">
+                   <property name="toolTip">
+                    <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Max allowed area change in ratio, to keep the area change stable. The reference area is predicted linearly.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                   </property>
+                   <property name="text">
+                    <string>weight intensity</string>
                    </property>
                   </widget>
                  </item>
@@ -1126,93 +1184,35 @@
                    </property>
                   </widget>
                  </item>
-                 <item row="2" column="1">
-                  <widget class="QSpinBox" name="time_gap_slave">
+                 <item row="5" column="0">
+                  <widget class="QLabel" name="label_29">
                    <property name="sizePolicy">
-                    <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
+                    <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
                      <horstretch>0</horstretch>
                      <verstretch>0</verstretch>
                     </sizepolicy>
                    </property>
-                   <property name="alignment">
-                    <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
-                   </property>
-                   <property name="value">
-                    <number>2</number>
-                   </property>
-                  </widget>
-                 </item>
-                 <item row="7" column="1">
-                  <widget class="QDoubleSpinBox" name="intensity_overflow_slave">
-                   <property name="alignment">
-                    <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
-                   </property>
-                   <property name="maximum">
-                    <double>1.000000000000000</double>
-                   </property>
-                   <property name="stepType">
-                    <enum>QAbstractSpinBox::AdaptiveDecimalStepType</enum>
-                   </property>
-                   <property name="value">
-                    <double>0.250000000000000</double>
-                   </property>
-                  </widget>
-                 </item>
-                 <item row="7" column="0">
-                  <widget class="QLabel" name="label_32">
                    <property name="toolTip">
-                    <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Max allowed intensity change in ratio, to keep the crystal intensity stable. The reference intensity is predicted linearly.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                    <string>min elapse of time for area fitting</string>
                    </property>
                    <property name="text">
-                    <string>max intensity overflow</string>
+                    <string>min sampling elapse</string>
                    </property>
                   </widget>
                  </item>
-                 <item row="9" column="1">
-                  <widget class="QDoubleSpinBox" name="w_dist">
-                   <property name="alignment">
-                    <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+                 <item row="13" column="0" rowspan="2">
+                  <widget class="QLabel" name="label_38">
+                   <property name="sizePolicy">
+                    <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
+                     <horstretch>0</horstretch>
+                     <verstretch>0</verstretch>
+                    </sizepolicy>
                    </property>
-                   <property name="maximum">
-                    <double>1000.000000000000000</double>
+                   <property name="toolTip">
+                    <string>min elapse of time for area fitting</string>
                    </property>
-                   <property name="stepType">
-                    <enum>QAbstractSpinBox::AdaptiveDecimalStepType</enum>
-                   </property>
-                   <property name="value">
-                    <double>1.000000000000000</double>
-                   </property>
-                  </widget>
-                 </item>
-                 <item row="13" column="1">
-                  <widget class="QDoubleSpinBox" name="w_area">
-                   <property name="alignment">
-                    <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
-                   </property>
-                   <property name="maximum">
-                    <double>1000.000000000000000</double>
-                   </property>
-                   <property name="stepType">
-                    <enum>QAbstractSpinBox::AdaptiveDecimalStepType</enum>
-                   </property>
-                   <property name="value">
-                    <double>5.000000000000000</double>
-                   </property>
-                  </widget>
-                 </item>
-                 <item row="15" column="1">
-                  <widget class="QDoubleSpinBox" name="w_intensity">
-                   <property name="alignment">
-                    <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
-                   </property>
-                   <property name="maximum">
-                    <double>1000.000000000000000</double>
-                   </property>
-                   <property name="stepType">
-                    <enum>QAbstractSpinBox::AdaptiveDecimalStepType</enum>
-                   </property>
-                   <property name="value">
-                    <double>1.000000000000000</double>
+                   <property name="text">
+                    <string>weight area</string>
                    </property>
                   </widget>
                  </item>
@@ -1776,102 +1776,6 @@
  <resources/>
  <connections>
   <connection>
-   <sender>time_gap_slave</sender>
-   <signal>valueChanged(int)</signal>
-   <receiver>time_gap</receiver>
-   <slot>setValue(int)</slot>
-   <hints>
-    <hint type="sourcelabel">
-     <x>430</x>
-     <y>110</y>
-    </hint>
-    <hint type="destinationlabel">
-     <x>430</x>
-     <y>164</y>
-    </hint>
-   </hints>
-  </connection>
-  <connection>
-   <sender>time_gap</sender>
-   <signal>valueChanged(int)</signal>
-   <receiver>time_gap_slave</receiver>
-   <slot>setValue(int)</slot>
-   <hints>
-    <hint type="sourcelabel">
-     <x>430</x>
-     <y>164</y>
-    </hint>
-    <hint type="destinationlabel">
-     <x>430</x>
-     <y>110</y>
-    </hint>
-   </hints>
-  </connection>
-  <connection>
-   <sender>min_sampling_count</sender>
-   <signal>valueChanged(int)</signal>
-   <receiver>min_sampling_count_slave</receiver>
-   <slot>setValue(int)</slot>
-   <hints>
-    <hint type="sourcelabel">
-     <x>430</x>
-     <y>245</y>
-    </hint>
-    <hint type="destinationlabel">
-     <x>430</x>
-     <y>137</y>
-    </hint>
-   </hints>
-  </connection>
-  <connection>
-   <sender>min_sampling_count_slave</sender>
-   <signal>valueChanged(int)</signal>
-   <receiver>min_sampling_count</receiver>
-   <slot>setValue(int)</slot>
-   <hints>
-    <hint type="sourcelabel">
-     <x>430</x>
-     <y>137</y>
-    </hint>
-    <hint type="destinationlabel">
-     <x>430</x>
-     <y>245</y>
-    </hint>
-   </hints>
-  </connection>
-  <connection>
-   <sender>min_sampling_elapse_slave</sender>
-   <signal>valueChanged(int)</signal>
-   <receiver>min_sampling_elapse</receiver>
-   <slot>setValue(int)</slot>
-   <hints>
-    <hint type="sourcelabel">
-     <x>430</x>
-     <y>164</y>
-    </hint>
-    <hint type="destinationlabel">
-     <x>430</x>
-     <y>272</y>
-    </hint>
-   </hints>
-  </connection>
-  <connection>
-   <sender>min_sampling_elapse</sender>
-   <signal>valueChanged(int)</signal>
-   <receiver>min_sampling_elapse_slave</receiver>
-   <slot>setValue(int)</slot>
-   <hints>
-    <hint type="sourcelabel">
-     <x>430</x>
-     <y>272</y>
-    </hint>
-    <hint type="destinationlabel">
-     <x>430</x>
-     <y>164</y>
-    </hint>
-   </hints>
-  </connection>
-  <connection>
    <sender>area_overflow</sender>
    <signal>valueChanged(double)</signal>
    <receiver>area_overflow_slave</receiver>
@@ -1996,6 +1900,102 @@
     <hint type="destinationlabel">
      <x>430</x>
      <y>137</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>min_sampling_count_slave</sender>
+   <signal>valueChanged(int)</signal>
+   <receiver>min_sampling_count</receiver>
+   <slot>setValue(int)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>430</x>
+     <y>137</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>430</x>
+     <y>245</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>min_sampling_count</sender>
+   <signal>valueChanged(int)</signal>
+   <receiver>min_sampling_count_slave</receiver>
+   <slot>setValue(int)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>430</x>
+     <y>245</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>430</x>
+     <y>137</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>min_sampling_elapse</sender>
+   <signal>valueChanged(int)</signal>
+   <receiver>min_sampling_elapse_slave</receiver>
+   <slot>setValue(int)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>430</x>
+     <y>272</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>430</x>
+     <y>164</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>min_sampling_elapse_slave</sender>
+   <signal>valueChanged(int)</signal>
+   <receiver>min_sampling_elapse</receiver>
+   <slot>setValue(int)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>430</x>
+     <y>164</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>430</x>
+     <y>272</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>time_gap</sender>
+   <signal>valueChanged(int)</signal>
+   <receiver>time_gap_slave</receiver>
+   <slot>setValue(int)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>430</x>
+     <y>164</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>430</x>
+     <y>110</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>time_gap_slave</sender>
+   <signal>valueChanged(int)</signal>
+   <receiver>time_gap</receiver>
+   <slot>setValue(int)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>430</x>
+     <y>110</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>430</x>
+     <y>164</y>
     </hint>
    </hints>
   </connection>

@@ -98,7 +98,7 @@ def independent_match(tables: list[pd.DataFrame], area_normalizer=500., nn=5, ti
         for track, mod_area, mod_gray in zip(tracks, pred_area, pred_gray):
 
             # these tracks are terminated for big time gap
-            if track[-1][0] - i_frame > time_gap_thr:
+            if track[-1][0] - i_frame > time_gap_thr + 1:
                 continue
 
             i_frame_last, i_crystal_last = track[-1]
@@ -180,51 +180,36 @@ def linear_programming(tables, area_normalizer=500., nn=10, time_gap_thr=10, min
     # init from the last frame
     # chains: the tracks. list of (frame, crystal_id)
     # pred_area: predicted area based on previous discovery
-    tracks = []
-    pred_area = []
-    pred_gray = []
+    tracks = [(len(tables) - 1, i) for i in len(tables[-1])]
     trees = [KDTree(t[['y', 'x']]) for t in tables]
-    for ind, row in tables[-1].iterrows():
-        tracks.append([(len(tables) - 1, ind)])
-        # init as the start crystal size
-        pred_area.append(Predictor(min_sampling_count, min_sampling_elapse).fit([0], [row['area']]))
-        pred_gray.append(Predictor().fit([0], [row['intensity']]))
 
-    # start tracking from the one but last frame
+    # start tracking from the 2nd last frame
     for i_frame in tqdm(range(len(tables) - 2 , -1, -1)):
         if callback is not None:
             callback()
         cur_features = tables[i_frame][['y', 'x', 'area', 'intensity']].to_numpy()
-        n = min(nn, len(cur_features))
+        pre_features = tables[i_frame + 1][['y', 'x', 'area', 'intensity']].to_numpy()
+        n = min(nn, len(cur_features), len(pre_features))
         cur_ind = trees[i_frame].query(cur_features[:, :2], n, dualtree=True, return_distance=False)
+        pre_ind = trees[i_frame + 1].query(pre_features[:, :2], n, dualtree=True, return_distance=False)
         cur_pos = np.array([cur_features[i[1:], :2] for i in cur_ind]).reshape(cur_ind.shape[0], -1)
+        pre_pos = np.array([pre_features[i[1:], :2] for i in pre_ind]).reshape(pre_ind.shape[0], -1)
         cur_features = np.concatenate([cur_features, cur_pos], axis=1)
-
-        active = []
-        pre_features = []
-        for t, mod_area, mod_gray in zip(tracks, pred_area, pred_gray):
-            i_frame_last, i_crystal_last = t[-1]
-            if i_frame_last - i_frame > time_gap_thr:
-                continue
-            active.append(t)
-            feature = tables[i_frame_last].loc[i_crystal_last, ['y', 'x']].to_list()
-            prev_ind = trees[i_frame_last].query([feature], n, return_distance=False)[0][1:]
-            prev_pos = tables[i_frame_last].loc[prev_ind, ['y', 'x']].to_numpy().reshape(-1)
-            feature.append(mod_area.predict(i_frame))
-            feature.append(mod_gray.predict(i_frame))
-            feature.extend(list(prev_pos))
-            pre_features.append(feature)
-        if len(active) == 0:
-            continue
-        pre_features = np.array(pre_features)
+        pre_features = np.concatenate([pre_features, pre_pos], axis=1)
 
         # linear programming
         mat = cost_func(pre_features.reshape(-1, 1, pre_features.shape[1]),
                         cur_features.reshape(1, -1, cur_features.shape[1]))
         choice = linear_sum_assignment(mat)
 
-        for t, c, mod_area, mod_gray, f1 in zip(active, choice[1], pred_area, pred_gray, pre_features):
+        for t in tracks:
             # update tracks and models
+            i_frame_last, i_crystal = t[-1]
+            if i_frame_last - i_frame > 1:
+                continue
+
+            f1 = pre_features[i_crystal]
+            f2 = cur_features[choice[1][i_crystal]]
             coord = f1[:2]
             ref_area = f1[2]
             ref_gray = f1[3]

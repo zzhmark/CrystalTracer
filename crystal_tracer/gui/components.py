@@ -21,22 +21,96 @@ class FigureComponent(QVBoxLayout):
         self.addWidget(tb)
 
     def reset(self):
-        self.ax.clear()
-        if self.axis_off:
-            self.ax.axis('off')
+        self.ax.cla()
         self.canvas.draw()
 
 
-class AnimatedFigureComponent(FigureComponent):
+class AnimatedComponent(FigureComponent):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.ani = None
+
+    def reset(self):
+        if self.ani is not None:
+            self.ani.event_source.stop()
+        super().reset()
+        self.ani = None
+
+    def _update_plot(self, num):
+        pass
+
+    def update_plot(self, num):
+        self.ani.frame_seq = self.ani.new_frame_seq()
+        self.ani.event_source.stop()
+        self._update_plot(num)
+        self.canvas.draw()
+
+
+class AnimatedLine2D(AnimatedComponent):
+    def __init__(self):
+        super().__init__(axis_off=False, projection3d=False)
+        self.x_data = None
+        self.y_data = None
+        self.line = None
+        self.ani = None
+        plt.tight_layout()
+        self.ax.spines['top'].set_visible(False)
+        self.ax.spines['right'].set_visible(False)
+
+    def new(self, x_data, y_data):
+        self.reset()
+        self.x_data = x_data
+        self.y_data = y_data
+        self.ax.set_aspect('equal')
+        self.line, = self.ax.plot([], [])
+        self.ax.set_xlabel('Time elapse')
+        self.ax.set_ylabel('Crystal area')
+        self.ax.set_xlim(0, max(x_data))
+        self.ax.set_ylim(0, max(y_data) * 1.25)
+
+        def init():
+            self.line.set_data([], [])
+            return self.line,
+
+        self.ani = animation.FuncAnimation(self.fig, self._update_plot, len(x_data), init,
+                                           interval=1, repeat=True)
+        self.canvas.draw()
+
+    def _update_plot(self, num):
+        self.line.set_data(self.x_data[:num], self.y_data[:num])
+        return self.line,
+
+
+class MultiPage(AnimatedComponent):
+    def __init__(self):
+        super().__init__(axis_off=True, projection3d=False)
+        self.stack = None
+        self.im = None
+        self.ani = None
+
+    def new(self, stack):
+        self.reset()
+        self.stack = stack
+        self.im = self.ax.imshow(stack[0])
+        self.ani = animation.FuncAnimation(self.fig, self._update_plot, len(stack),
+                                           interval=1, repeat=True)
+        self.canvas.draw()
+
+    def _update_plot(self, num):
+        self.im.set_array(self.stack[num])
+        return [self.im]
+
+
+class AnimatedLines3D(AnimatedComponent):
     def __init__(self):
         super().__init__(axis_off=False, projection3d=True)
         self.walks = None
-        self.lines = None
         self.timescale = None
+        self.lines = None
         self.ani = None
 
     def new(self, timescale, walks):
-
+        self.reset()
         self.walks = walks
         self.timescale = timescale
 
@@ -54,10 +128,10 @@ class AnimatedFigureComponent(FigureComponent):
         self.ax.set(zlim3d=(0, len(timescale) - 1), zlabel='Timestamp')
 
         self.ani = animation.FuncAnimation(
-            self.fig, self.update_plot, len(timescale), interval=1, repeat=True)
+            self.fig, self._update_plot, len(timescale), interval=1, repeat=True)
         self.canvas.draw()
 
-    def update_plot(self, num):
+    def _update_plot(self, num):
         for line, walk in zip(self.lines, self.walks):
             n = int(num - walk[2, 0])
             if n > 0:

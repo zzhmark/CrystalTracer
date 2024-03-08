@@ -166,16 +166,14 @@ def linear_programming2(tables, area_normalizer=500., nn=10, time_gap_thr=10, mi
         p1 = v1[:2]
         p2 = v2[:2]
         dist = np.linalg.norm(p1 - p2)
-        area_diff = ratio_diff(v1[2] - v2[2])
-        gray_diff = ratio_diff(v1[3] - v2[3])
-        v1 = v1[4:].reshape(-1, 2)
-        v2 = v2[4:].reshape(-1, 2)
-        local_score = neighborhood_match(p1, v1, [p2], [v2])[0]
-        return (w_dist * dist + w_local * local_score) * area_diff * gray_diff
+        area_diff = abs(v1[2] - v2[2])
+        gray_diff = abs(v1[3] - v2[3])
+        # v1 = v1[4:].reshape(-1, 2)
+        # v2 = v2[4:].reshape(-1, 2)
+        # local_score = neighborhood_match(p1, v1, [p2], [v2])[0]
+        return w_dist * dist ** 2 + w_area * area_diff + w_intensity * gray_diff
 
     cost_func = np.vectorize(cost, signature='(n),(n)->()')
-
-    nn += 1
 
     # init from the last frame
     # chains: the tracks. list of (frame, crystal_id)
@@ -195,24 +193,24 @@ def linear_programming2(tables, area_normalizer=500., nn=10, time_gap_thr=10, mi
         if callback is not None:
             callback()
         cur_features = tables[i_frame][['y', 'x', 'area', 'intensity']].to_numpy()
-        n = min(nn, len(cur_features))
-        cur_ind = trees[i_frame].query(cur_features[:, :2], n, dualtree=True, return_distance=False)
-        cur_pos = np.array([cur_features[i[1:], :2] for i in cur_ind]).reshape(cur_ind.shape[0], -1)
-        cur_features = np.concatenate([cur_features, cur_pos], axis=1)
+        # n = min(nn, len(cur_features))
+        # cur_ind = trees[i_frame].query(cur_features[:, :2], n, dualtree=True, return_distance=False)
+        # cur_pos = np.array([cur_features[i, :2] for i in cur_ind]).reshape(cur_ind.shape[0], -1)
+        # cur_features = np.concatenate([cur_features, cur_pos], axis=1)
 
         active = []
         pre_features = []
         for t, mod_area, mod_gray in zip(tracks, pred_area, pred_gray):
             i_frame_last, i_crystal_last = t[-1]
-            if i_frame_last - i_frame > time_gap_thr + 1:
+            if i_frame_last - i_frame > 1:
                 continue
             active.append(t)
             feature = tables[i_frame_last].loc[i_crystal_last, ['y', 'x']].to_list()
-            prev_ind = trees[i_frame_last].query([feature], n, return_distance=False)[0][1:]
-            prev_pos = tables[i_frame_last].loc[prev_ind, ['y', 'x']].to_numpy().reshape(-1)
+            # prev_ind = trees[i_frame_last].query([feature], n, return_distance=False)[0]
+            # prev_pos = tables[i_frame_last].loc[prev_ind, ['y', 'x']].to_numpy().reshape(-1)
             feature.append(mod_area.predict(i_frame))
             feature.append(mod_gray.predict(i_frame))
-            feature.extend(list(prev_pos))
+            # feature.extend(list(prev_pos))
             pre_features.append(feature)
         if len(active) == 0:
             continue
@@ -254,44 +252,36 @@ def linear_programming2(tables, area_normalizer=500., nn=10, time_gap_thr=10, mi
     return tracks
 
 
-def linear_programming(tables, area_normalizer=500., nn=10, time_gap_thr=10, min_sampling_count=5, min_sampling_elapse=10,
-                       max_area_overflow=.25, max_intensity_overflow=.25, w_dist=1., w_area=1., w_intensity=1., w_local=1.,
-                       callback=None):
+def linear_programming(tables, area_normalizer=500., use_contig=True, callback=None):
     """
     Connect the crystals in each frame in and independent manner, starting from the last frame. It forms a track for
     each crystal in the last frame until it disappears in reverse time order. The output will be reversed back.
 
     :param tables: a list of dataframes of detected crystals
     :param area_normalizer: the distance threshold
-    :param nn: number of nearest neighboring crystals considered for matching
-    :param time_gap_thr: max time gap allowed in the track
-    :param min_sampling_count: min No. of sampling points for area fitting
-    :param min_sampling_elapse: min time elapse of sampling points for area fitting
-    :param max_area_overflow: the max ratio of area difference
-    :param max_intensity_overflow: the max ratio of intensity difference
+    :param use_contig: if allow the tracing to be continued on broken tracks (will affect all the tracks)
     :return: identified tracks, a list of lists of tuples, (frame, index)
     """
-
-    def cost(v1, v2):
-        p1 = v1[:2]
-        p2 = v2[:2]
-        dist = np.linalg.norm(p1 - p2)
-        # area_diff = ratio_diff(v1[2], v2[2])
-        # gray_diff = ratio_diff(v1[3], v2[3])
-        # v1 = v1[4:].reshape(-1, 2)
-        # v2 = v2[4:].reshape(-1, 2)
-        # local_score = neighborhood_match(p1, v1, [p2], [v2])[0]
-        return dist ** 10
-
-    cost_func = np.vectorize(cost, signature='(n),(n)->()')
-
-    nn += 1
+    # preprocessing: rmdup
+    for i, tab in enumerate(tables):
+        flag = [True] * len(tab)
+        coords = tab[['y', 'x']].to_numpy()
+        radii = np.sqrt(tab['area'].to_numpy() / pi)
+        points1 = coords[:, np.newaxis, :]
+        points2 = coords[np.newaxis, :, :]
+        dist = np.sqrt(np.sum((points1 - points2) ** 2, axis=-1))
+        dist[dist == 0] = np.inf
+        for a, b in np.argwhere(dist < radii):
+            if radii[a] < radii[b]:
+                flag[a] = False
+            else:
+                flag[b] = False
+        tables[i] = tab[flag]
 
     # init from the last frame
     # chains: the tracks. list of (frame, crystal_id)
     # pred_area: predicted area based on previous discovery
     tracks = [[(len(tables) - 1, i)] for i in range(len(tables[-1]))]
-    trees = [KDTree(t[['y', 'x']]) for t in tables]
 
     # start tracking from the 2nd last frame
     for i_frame in tqdm(range(len(tables) - 2 , -1, -1)):
@@ -299,21 +289,20 @@ def linear_programming(tables, area_normalizer=500., nn=10, time_gap_thr=10, min
             callback()
         pre_features = tables[i_frame + 1][['y', 'x', 'area', 'intensity']].to_numpy()
         cur_features = tables[i_frame][['y', 'x', 'area', 'intensity']].to_numpy()
-        # n = min(nn, len(cur_features), len(pre_features))
-        # cur_ind = trees[i_frame].query(cur_features[:, :2], n, dualtree=True, return_distance=False)
-        # pre_ind = trees[i_frame + 1].query(pre_features[:, :2], n, dualtree=True, return_distance=False)
-        # cur_pos = np.array([cur_features[i[1:], :2] for i in cur_ind]).reshape(cur_ind.shape[0], -1)
-        # pre_pos = np.array([pre_features[i[1:], :2] for i in pre_ind]).reshape(pre_ind.shape[0], -1)
-        # cur_features = np.concatenate([cur_features, cur_pos], axis=1)
-        # pre_features = np.concatenate([pre_features, pre_pos], axis=1)
 
         # linear programming
-        mat = cost_func(pre_features.reshape(-1, 1, pre_features.shape[1]),
-                        cur_features.reshape(1, -1, cur_features.shape[1]))
-        choice = linear_sum_assignment(mat)
+        sq_diff = (pre_features[:, np.newaxis, :2] - cur_features[np.newaxis, :, :2]) ** 2
+        distances = np.sqrt(np.sum(sq_diff, axis=-1))
+        area_diff = ratio_diff(pre_features[:, np.newaxis, 2], cur_features[np.newaxis, :, 2])
+        intensity_diff = ratio_diff(pre_features[:, np.newaxis, 3], cur_features[np.newaxis, :, 3])
+        s = np.log((distances + 1) * area_diff * intensity_diff)
 
-        choice = dict(zip(choice[0], choice[1]))
+        choice = linear_sum_assignment(s)
 
+        pre_ind = tables[i_frame + 1].index.to_numpy()
+        cur_ind = tables[i_frame].index.to_numpy()
+        choice = dict(zip(pre_ind[choice[0]], cur_ind[choice[1]]))
+        used = set()
         for t in tracks:
             # update tracks and models
             i_frame_last, i_crystal_last = t[-1]
@@ -322,22 +311,20 @@ def linear_programming(tables, area_normalizer=500., nn=10, time_gap_thr=10, min
             if i_crystal_last not in choice:
                 continue
             c = choice[i_crystal_last]
-            # f1 = pre_features[i_crystal_last]
-            # f2 = cur_features[c]
-            #
-            # coord = f1[:2]
-            # ref_area = f1[2]
-            # ref_gray = f1[3]
-            # dist_thr = area_normalizer / sqrt(ref_area)
-            # cur_coord = f2[:2]
-            # cur_area = f2[2]
-            # cur_gray = f2[3]
-            # scale = sqrt(area_normalizer / ref_area)
-            # if np.linalg.norm(coord - cur_coord) > dist_thr or \
-            #         abs(ref_area - cur_area) > max_area_overflow * scale * ref_area or \
-            #         abs(cur_gray - ref_gray) > max_intensity_overflow * scale * ref_gray:
-            #     continue
+            pre_area = tables[i_frame_last].at[i_crystal_last, 'area']
+            pre_coords = tables[i_frame_last].loc[i_crystal_last, ['y', 'x']]
+            cur_coords = tables[i_frame].loc[c, ['y', 'x']]
+
+            dist_thr = area_normalizer / sqrt(pre_area)
+            if np.linalg.norm(pre_coords - cur_coords) > dist_thr:
+                continue
             t.append((i_frame, c))
+            used.add(c)
+
+        if use_contig:
+            for c in set(cur_ind) - used:
+                tracks.append([(i_frame, c)])
+
 
     for t in tracks:
         t.reverse()

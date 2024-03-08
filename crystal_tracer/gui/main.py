@@ -4,13 +4,16 @@ import pickle
 import shutil
 import configparser
 from pathlib import Path
+import numpy as np
 from PySide6.QtCore import Slot, QThread, Qt
-from PySide6.QtWidgets import QApplication, QMainWindow, QButtonGroup, QFileDialog, QMessageBox, QProgressDialog
+from PySide6.QtWidgets import QApplication, QMainWindow, QButtonGroup, QFileDialog, QMessageBox, QProgressDialog, \
+    QInputDialog
+from PySide6.QtGui import QStandardItemModel, QStandardItem
 from crystal_tracer.gui.ui_loader import loadUi
 from crystal_tracer.img_utils import load_czi_slice, get_czi_shape
-from crystal_tracer.gui.workers import PreviewRunner, DetectionTask, TrackingTask, \
-    RecordingTask, WalkRunner, TrackingTask2
-from crystal_tracer.gui.components import FigureComponent, AnimatedFigureComponent
+from crystal_tracer.gui.workers import PreviewFilterTask, DetectionTask, TrackingTask, \
+    RecordingTask, WalkTask, TrackingTask2, PreviewRecordingTask
+from crystal_tracer.gui.components import FigureComponent, AnimatedLines3D, AnimatedLine2D, MultiPage
 
 
 class CrystalTracerApp(QMainWindow):
@@ -18,15 +21,13 @@ class CrystalTracerApp(QMainWindow):
         super().__init__()
         # data
         self._wkdir: Path | None = None
-        self._config_path: Path| None = None
+        self._config_path: Path | None = None
         self._img_path: Path | None = None
         self._tracks_path: Path | None = None
         self._table_paths: list[Path] | None = None
         self._mask_paths: list[Path] | None = None
         self._tracks: list[list[tuple[int, int]]] | None = None
-        self._plot_paths: list[Path] | None = None
-        self._video_paths: list[Path] | None = None
-        self.task = None
+        self.task: QThread | None = None
         self.ani = None
 
         # Load the UI file
@@ -48,13 +49,13 @@ class CrystalTracerApp(QMainWindow):
         self.action_open_image.triggered.connect(self.on_import_image)
         self.action_open_detection.triggered.connect(self.on_open_detection)
         self.action_open_tracking.triggered.connect(self.on_open_tracking)
-        self.action_open_recording.triggered.connect(self.on_open_recording)
         self.action_open_wkdir.triggered.connect(self.open_wkdir)
         self.action_open.triggered.connect(self.open_sth)
         self.action_load_config.triggered.connect(self.load_config)
         self.action_save_config.triggered.connect(self.save_config)
         self.addAction(self.action_open)
         self.action_set_wkdir.triggered.connect(self.set_wkdir)
+        self.action_batch.triggered.connect(self.run_batch)
 
         # browse buttons
         self.browse_save_detection.clicked.connect(self.set_save_dir_detection)
@@ -82,9 +83,14 @@ class CrystalTracerApp(QMainWindow):
         # canvas
         self.detection_input.setLayout(FigureComponent())
         self.detection_output.setLayout(FigureComponent())
-        self.tracking_result.setLayout(AnimatedFigureComponent())
-        self.growth_plot.setLayout(FigureComponent())
-        self.growth_video.setLayout(FigureComponent())
+        self.tracking_result.setLayout(AnimatedLines3D())
+        self.growth_plot.setLayout(AnimatedLine2D())
+        self.growth_video.setLayout(MultiPage())
+
+        # listview
+        self.list_track_model = QStandardItemModel()
+        self.list_track.setModel(self.list_track_model)
+        self.list_track.clicked.connect(self.preview_recording)
 
         # misc
         self.radio_gfp.toggled.connect(self.detection_update_raw)
@@ -93,13 +99,58 @@ class CrystalTracerApp(QMainWindow):
         self.erase_image.clicked.connect(self.on_erase_image)
         self.erase_detection.clicked.connect(self.on_erase_detection)
         self.erase_tracks.clicked.connect(self.on_erase_tracks)
-        self.erase_recording.clicked.connect(self.on_erase_recording)
         self.group_input.setEnabled(False)
         self.group_output.setEnabled(False)
         self.group_tracks.setEnabled(False)
         self.group_plot.setEnabled(False)
         self.group_video.setEnabled(False)
         self.play_bar.valueChanged.connect(self.slider_changed)
+        self.play_bar_2.valueChanged.connect(self.slider_changed)
+
+    @Slot(int)
+    def preview_recording(self, index):
+        if self._img_path is None:
+            QMessageBox.critical(self, 'Error', 'No image imported.')
+            return
+        if self._table_paths is None:
+            QMessageBox.critical(self, 'Error', 'No detection results imported.')
+            return
+        if self._tracks is None:
+            QMessageBox.critical(self, 'Error', 'No tracking results specified.')
+            return
+        print('Perform recording preview')
+        item = self.list_track_model.itemFromIndex(index)
+        progress = QProgressDialog('Visualizing the selected track..', 'Cancel', 0, 0, self)
+        progress.setWindowFlags(progress.windowFlags() & ~Qt.WindowCloseButtonHint)
+        progress.setCancelButton(None)
+        progress.setWindowTitle('Processing')
+        progress.setModal(True)
+        progress.show()
+        task = PreviewRecordingTask(self._tracks[item.data(Qt.UserRole)], self._img_path, self._table_paths,
+                                    self._mask_paths, self.win_rad.value())
+        task.finished.connect(progress.close)
+        progress.canceled.connect(task.quit)
+        task.start()
+        progress.exec()
+        if task.isFinished():
+            self.group_plot.setEnabled(True)
+            self.group_video.setEnabled(True)
+            self.play_bar_2.setMaximum(len(task.x_data) - 1)
+            self.play_bar_2.setMinimum(0)
+            self.play_bar_2.setValue(0)
+            self.growth_plot.layout().new(task.x_data, task.y_data)
+            self.growth_video.layout().new(task.stack)
+
+    def update_listview(self):
+        if self._tracks is None:
+            self.list_track_model.clear()
+        else:
+            elapse = [t[-1][0] - t[0][0] for t in self._tracks]
+            for i in reversed(np.argsort(elapse)):
+                i1, i2 = self._tracks[i][-1]
+                item = QStandardItem(f'T_{i1}_C_{i2} ({elapse[i]})')
+                item.setData(i , Qt.UserRole)
+                self.list_track_model.appendRow(item)
 
     @Slot()
     def load_config(self):
@@ -116,9 +167,13 @@ class CrystalTracerApp(QMainWindow):
         path = QFileDialog.getOpenFileName(self, 'Load configuration', str(path), 'INI files (*.ini)')[0]
         if not path:
             return
+        self.load_config(path)
+
+    def _load_config(self, path):
         config = configparser.ConfigParser()
         config.read(path, encoding='utf-8')
         print('Load config')
+
         if config.has_section('paths.open'):
             paths = config['paths.open']
             if 'wkdir' in paths:
@@ -129,8 +184,7 @@ class CrystalTracerApp(QMainWindow):
                 self.resolve_detection(paths['detection'])
             if 'tracks' in paths:
                 self.load_tracking(paths['tracks'])
-            if 'recording' in paths:
-                self.find_recording(paths['recording'])
+
         if config.has_section('paths.save'):
             paths = config['paths.save']
             if 'detection' in paths:
@@ -139,6 +193,7 @@ class CrystalTracerApp(QMainWindow):
                 self.save_path_tracking.setText(paths['tracks'])
             if 'recording' in paths:
                 self.save_dir_recording.setText(paths['recording'])
+
         if config.has_section('parameters.detection'):
             section = config['parameters.detection']
             self.gfp_channel.setValue(int(section['gfp_channel']))
@@ -155,6 +210,7 @@ class CrystalTracerApp(QMainWindow):
             self.bf_weight.setValue(float(section['bf_weight']))
             self.gfp_weight.setValue(float(section['gfp_weight']))
             self.dilation_radius.setValue(int(section['dilation_radius']))
+
         if config.has_section('parameters.tracking'):
             section = config['parameters.tracking']
             self.area_norm.setValue(float(section['area_norm'])),
@@ -163,11 +219,15 @@ class CrystalTracerApp(QMainWindow):
             self.min_sampling_count.setValue(int(section['min_sampling_count'])),
             self.min_sampling_elapse.setValue(int(section['min_sampling_elapse'])),
             self.area_overflow.setValue(float(section['area_overflow'])),
-            self.intensity_overflow.setValue(float(section['intensity_overflow'])),
-            self.w_dist.setValue(float(section['w_dist'])),
-            self.w_area.setValue(float(section['w_area'])),
-            self.w_intensity.setValue(float(section['w_intensity'])),
-            self.w_local.setValue(float(section['w_local'])),
+            self.intensity_overflow.setValue(float(section['intensity_overflow']))
+            self.use_contig.setChecked(config.getboolean('parameters.tracking', 'use_contig')),
+
+        if config.has_section('parameters.recording'):
+            section = config['parameters.recording']
+            self.win_rad.setValue(int(section['win_rad'])),
+            self.frame_rate.setValue(float(section['frame_rate'])),
+            self.elapse_thr.setValue(int(section['elapse_thr']))
+
         self._config_path = Path(path)
 
     @Slot()
@@ -185,8 +245,12 @@ class CrystalTracerApp(QMainWindow):
         path = QFileDialog.getSaveFileName(self, 'Save configuration', str(path), 'INI files (*.ini)')[0]
         if not path:
             return
+        self._save_config(path)
+
+    def _save_config(self, path):
         print('Save config')
         config = configparser.ConfigParser()
+
         paths = {}
         if self._wkdir is not None:
             paths['wkdir'] = str(self._wkdir)
@@ -196,9 +260,8 @@ class CrystalTracerApp(QMainWindow):
             paths['detection'] = str(self._table_paths[0].parent)
         if self._tracks_path is not None:
             paths['tracks'] = str(self._tracks_path)
-        if self._plot_paths is not None:
-            paths['recording'] = str(self._plot_paths[0].parent)
         config['paths.open'] = paths
+
         paths = {}
         if self.save_dir_detection.text():
             paths['detection'] = self.save_dir_detection.text()
@@ -207,6 +270,7 @@ class CrystalTracerApp(QMainWindow):
         if self.save_dir_recording.text():
             paths['recording'] = self.save_dir_recording.text()
         config['paths.save'] = paths
+
         config['parameters.detection'] = {
             'gfp_channel': self.gfp_channel.value(),
             'bf_channel': self.bf_channel.value(),
@@ -223,6 +287,7 @@ class CrystalTracerApp(QMainWindow):
             'gfp_weight': self.gfp_weight.value(),
             'dilation_radius': self.dilation_radius.value()
         }
+
         config['parameters.tracking'] = {
             'area_norm': self.area_norm.value(),
             'nn': self.nn.value(),
@@ -231,11 +296,15 @@ class CrystalTracerApp(QMainWindow):
             'min_sampling_elapse': self.min_sampling_elapse.value(),
             'area_overflow': self.area_overflow.value(),
             'intensity_overflow': self.intensity_overflow.value(),
-            'w_dist': self.w_dist.value(),
-            'w_area': self.w_area.value(),
-            'w_intensity': self.w_intensity.value(),
-            'w_local': self.w_local.value(),
+            'use_contig': self.use_contig.isChecked()
         }
+
+        config['parameters.recording'] = {
+            'win_rad': self.win_rad.value(),
+            'frame_rate': self.frame_rate.value(),
+            'elapse_thr': self.elapse_thr.value()
+        }
+
         with open(path, 'w', encoding='utf-8') as f:
             config.write(f)
 
@@ -253,7 +322,7 @@ class CrystalTracerApp(QMainWindow):
         progress.setWindowTitle('Processing')
         progress.setModal(True)
         progress.show()
-        task = WalkRunner(self._tracks, self._table_paths)
+        task = WalkTask(self._tracks, self._table_paths)
         task.finished.connect(progress.close)
         progress.canceled.connect(task.quit)
         task.start()
@@ -266,45 +335,55 @@ class CrystalTracerApp(QMainWindow):
 
     @Slot(int)
     def slider_changed(self, value):
-        prop = self.tracking_result.layout()
-        if prop.ani is None:
+        slider = self.sender()
+        if slider is self.play_bar:
+            prop = [self.tracking_result.layout()]
+        elif slider is self.play_bar_2:
+            prop = [self.growth_plot.layout(), self.growth_video.layout()]
+        else:
+            raise ValueError("Invalid slider")
+        if prop[0].ani is None:
             self.statusBar().showMessage(f'No track visualized.')
             return
         else:
             self.statusBar().showMessage(f'Timestamp: {value}')
-        prop.ani.frame_seq = prop.ani.new_frame_seq()
-        prop.ani.event_source.stop()
-        prop.update_plot(value)
-        prop.canvas.draw_idle()
+        for p in prop:
+            p.update_plot(value)
 
     def on_erase_image(self):
         self.label_image.setText('')
         self.group_input.setEnabled(False)
         self.group_output.setEnabled(False)
+        self.group_plot.setEnabled(False)
+        self.group_video.setEnabled(False)
         self.detection_input.layout().reset()
         self.detection_output.layout().reset()
+        self.growth_plot.layout().reset()
+        self.growth_video.layout().reset()
+        self.update_listview()
         self._img_path = None
 
     def on_erase_detection(self):
         self.label_detection.setText('')
+        self.group_plot.setEnabled(False)
+        self.group_video.setEnabled(False)
+        self.growth_plot.layout().reset()
+        self.growth_video.layout().reset()
+        self.update_listview()
         self._table_paths = None
         self._mask_paths = None
 
     def on_erase_tracks(self):
         self.label_tracks.setText('')
         self.group_tracks.setEnabled(False)
-        self.tracing_result.layout().reset()
-        self._tracks = None
-        self._tracks_path = None
-
-    def on_erase_recording(self):
-        self.label_recording.setText('')
         self.group_plot.setEnabled(False)
         self.group_video.setEnabled(False)
+        self.tracing_result.layout().reset()
         self.growth_plot.layout().reset()
         self.growth_video.layout().reset()
-        self._plot_paths = None
-        self._video_paths = None
+        self.update_listview()
+        self._tracks = None
+        self._tracks_path = None
 
     @Slot()
     def detection_update_raw(self):
@@ -342,12 +421,12 @@ class CrystalTracerApp(QMainWindow):
         progress.setWindowTitle('Processing')
         progress.setModal(True)
         progress.show()
-        task = PreviewRunner(self._img_path, self.gfp_channel.value(), self.bf_channel.value(), self.raw_scroll.value(),
-                             self.block_size.value(), self.tolerance.value(), self.cutoff_ratio.value(),
-                             self.bg_thr.value(), self.active_contour.isChecked(),
-                             (self.shift_x.value(), self.shift_y.value()), self.dog_sigma.value(),
-                             self.sobel_sigma.value(), self.bf_weight.value(), self.gfp_weight.value(),
-                             self.dilation_radius.value())
+        task = PreviewFilterTask(self._img_path, self.gfp_channel.value(), self.bf_channel.value(), self.raw_scroll.value(),
+                                 self.block_size.value(), self.tolerance.value(), self.cutoff_ratio.value(),
+                                 self.bg_thr.value(), self.active_contour.isChecked(),
+                                 (self.shift_x.value(), self.shift_y.value()), self.dog_sigma.value(),
+                                 self.sobel_sigma.value(), self.bf_weight.value(), self.gfp_weight.value(),
+                                 self.dilation_radius.value())
         task.finished.connect(progress.close)
         progress.canceled.connect(task.quit)
         task.start()
@@ -357,14 +436,16 @@ class CrystalTracerApp(QMainWindow):
             self.detection_output.layout().canvas.draw()
 
     @Slot()
-    def task_detection(self):
+    def task_detection(self, msgbox=True, modal=False):
         if self._img_path is None:
-            QMessageBox.critical(self, 'Error', 'No image imported.')
-            return
+            if msgbox:
+                QMessageBox.critical(self, 'Error', 'No image imported.')
+            return False
         p = self.save_dir_detection.text()
         if not p:
-            QMessageBox.critical(self, 'Error', 'No save directory specified.')
-            return
+            if msgbox:
+                QMessageBox.critical(self, 'Error', 'No save directory specified.')
+            return False
         print('Perform detection')
         p = Path(p)
         if p.exists():
@@ -372,8 +453,6 @@ class CrystalTracerApp(QMainWindow):
         p.mkdir(parents=True, exist_ok=True)
         self.setEnabled(False)
         t, c, y, x = get_czi_shape(self._img_path)
-        self.detection_progress.setMaximum(t)
-        self.detection_progress.setValue(0)
         self.task = DetectionTask(self.nproc_detection.value(), t, self._img_path,
                                   self.gfp_channel.value(), self.bf_channel.value(), p,
                                   self.block_size.value(), self.tolerance.value(), self.cutoff_ratio.value(),
@@ -382,9 +461,25 @@ class CrystalTracerApp(QMainWindow):
                                   self.dog_sigma.value(),
                                   self.sobel_sigma.value(), self.bf_weight.value(), self.gfp_weight.value(),
                                   self.dilation_radius.value())
-        self.task.increment.connect(self.increment_detection_progress)
-        self.task.finished.connect(self.after_detection)
-        self.task.start()
+        if modal:
+            progress = QProgressDialog('Performing detection..', 'Cancel', 0, 0, self)
+            progress.setWindowFlags(progress.windowFlags() & ~Qt.WindowCloseButtonHint)
+            progress.setCancelButton(None)
+            progress.setWindowTitle('Processing')
+            progress.setModal(True)
+            progress.show()
+            self.task.finished.connect(progress.close)
+            progress.canceled.connect(self.task.quit)
+            self.task.start()
+            progress.exec()
+            self.setEnabled(True)
+        else:
+            self.detection_progress.setMaximum(t)
+            self.detection_progress.setValue(0)
+            self.task.increment.connect(self.increment_detection_progress)
+            self.task.finished.connect(self.after_detection)
+            self.task.start()
+        return True
 
     @Slot()
     def open_sth(self):
@@ -412,18 +507,19 @@ class CrystalTracerApp(QMainWindow):
         self.detection_progress.setValue(self.detection_progress.value() + 1)
 
     @Slot()
-    def task_tracking(self):
+    def task_tracking(self, msgbox=True, modal=False):
         if self._table_paths is None:
-            QMessageBox.critical(self, 'Error', 'No detection results specified.')
-            return
+            if msgbox:
+                QMessageBox.critical(self, 'Error', 'No detection results specified.')
+            return False
         p = self.save_path_tracking.text()
         if not p:
-            QMessageBox.critical(self, 'Error', 'No save path specified.')
-            return
-        print('Perform detection')
+            if msgbox:
+                QMessageBox.critical(self, 'Error', 'No save path specified.')
+            return False
+        print('Perform tracking')
         p = Path(p)
         p.parent.mkdir(parents=True, exist_ok=True)
-        self.setEnabled(False)
         self.tracking_progress.setMaximum(len(self._table_paths))
         self.tracking_progress.setValue(0)
         if self.track_algorithms.currentIndex() == 0:
@@ -432,15 +528,24 @@ class CrystalTracerApp(QMainWindow):
                                      self.min_sampling_elapse.value(), self.area_overflow.value(),
                                      self.intensity_overflow.value())
         else:
-            self.task = TrackingTask2(self._table_paths, p, self.area_norm.value(), self.nn.value(),
-                                      self.time_gap.value(), self.min_sampling_count.value(),
-                                      self.min_sampling_elapse.value(),
-                                      self.area_overflow.value(), self.intensity_overflow.value(),
-                                      self.w_dist.value(), self.w_area.value(), self.w_intensity.value(),
-                                      self.w_local.value())
-        self.task.increment.connect(self.increment_tracking_progress)
-        self.task.finished.connect(self.after_tracking)
-        self.task.start()
+            self.task = TrackingTask2(self._table_paths, p, self.area_norm.value(), self.use_contig.value())
+        if modal:
+            progress = QProgressDialog('Performing tracking..', 'Cancel', 0, 0, self)
+            progress.setWindowFlags(progress.windowFlags() & ~Qt.WindowCloseButtonHint)
+            progress.setCancelButton(None)
+            progress.setWindowTitle('Processing')
+            progress.setModal(True)
+            progress.show()
+            self.task.finished.connect(progress.close)
+            progress.canceled.connect(self.task.quit)
+            self.task.start()
+            progress.exec()
+        else:
+            self.setEnabled(False)
+            self.task.increment.connect(self.increment_tracking_progress)
+            self.task.finished.connect(self.after_tracking)
+            self.task.start()
+        return True
 
     @Slot()
     def increment_tracking_progress(self):
@@ -455,33 +560,51 @@ class CrystalTracerApp(QMainWindow):
         self.setEnabled(True)
 
     @Slot()
-    def task_recording(self):
+    def task_recording(self, msgbox=True, modal=False):
         if self._img_path is None:
-            QMessageBox.critical(self, 'Error', 'No image imported.')
-            return
+            if msgbox:
+                QMessageBox.critical(self, 'Error', 'No image imported.')
+            return False
         if self._table_paths is None:
-            QMessageBox.critical(self, 'Error', 'No detection results specified.')
-            return
+            if msgbox:
+                QMessageBox.critical(self, 'Error', 'No detection results specified.')
+            return False
         if self._tracks is None:
-            QMessageBox.critical(self, 'Error', 'No tracking results specified.')
-            return
+            if msgbox:
+                QMessageBox.critical(self, 'Error', 'No tracking results specified.')
+            return False
         p = self.save_dir_recording.text()
         if not p:
-            QMessageBox.critical(self, 'Error', 'No save directory specified.')
-            return
+            if msgbox:
+                QMessageBox.critical(self, 'Error', 'No save directory specified.')
+            return False
         print('Perform recording')
         p = Path(p)
         if p.exists():
             shutil.rmtree(p)
         p.mkdir(parents=True, exist_ok=True)
-        self.setEnabled(False)
-        self.recording_progress.setMaximum(len(self._tracks))
+        tracks = [t for t in self._tracks if len(t) > self.elapse_thr.value()]
+        self.recording_progress.setMaximum(len(tracks))
         self.recording_progress.setValue(0)
-        self.task = RecordingTask(self.nproc_recording.value(), self._tracks, p,
-                                  self._img_path, self._table_paths, self._mask_paths, 50, 25.)
-        self.task.increment.connect(self.increment_recording_progress)
-        self.task.finished.connect(self.after_recording)
-        self.task.start()
+        self.task = RecordingTask(self.nproc_recording.value(), tracks, p, self._img_path, self._table_paths,
+                                  self._mask_paths, self.win_rad.value(), self.frame_rate.value())
+        if modal:
+            progress = QProgressDialog('Performing recording..', 'Cancel', 0, 0, self)
+            progress.setWindowFlags(progress.windowFlags() & ~Qt.WindowCloseButtonHint)
+            progress.setCancelButton(None)
+            progress.setWindowTitle('Processing')
+            progress.setModal(True)
+            progress.show()
+            self.task.finished.connect(progress.close)
+            progress.canceled.connect(self.task.quit)
+            self.task.start()
+            progress.exec()
+        else:
+            self.setEnabled(False)
+            self.task.increment.connect(self.increment_recording_progress)
+            self.task.finished.connect(self.after_recording)
+            self.task.start()
+        return True
 
     @Slot()
     def increment_recording_progress(self):
@@ -491,7 +614,6 @@ class CrystalTracerApp(QMainWindow):
     def after_recording(self):
         print('Recording task done.')
         self.task = None
-        self.find_recording(self.save_dir_recording.text())
         self.setEnabled(True)
 
     def _init_detection_dir(self):
@@ -559,7 +681,15 @@ class CrystalTracerApp(QMainWindow):
         if self.set_wkdir():
             self.resolve_detection(self.save_dir_detection.text())
             self.load_tracking(self.save_path_tracking.text())
-            self.find_recording(self.save_dir_recording.text())
+
+    def _init_wkdir(self, path):
+        path = Path(path)
+        self._wkdir = path
+        p1 = path / 'detection'
+        p2 = path / 'recording'
+        self.save_dir_detection.setText(str(p1))
+        self.save_path_tracking.setText(str(path / 'tracks.pkl'))
+        self.save_dir_recording.setText(str(p2))
 
     @Slot()
     def set_wkdir(self):
@@ -574,13 +704,7 @@ class CrystalTracerApp(QMainWindow):
         path = QFileDialog.getExistingDirectory(self, 'Set working directory', str(path))
         if not path:
             return False
-        path = Path(path)
-        self._wkdir = path
-        p1 = path / 'detection'
-        p2 = path / 'recording'
-        self.save_dir_detection.setText(str(p1))
-        self.save_path_tracking.setText(str(path / 'tracks.pkl'))
-        self.save_dir_recording.setText(str(p2))
+        self._init_wkdir(path)
         return True
 
     @Slot()
@@ -625,8 +749,8 @@ class CrystalTracerApp(QMainWindow):
         try:
             print('Loading detection results', path)
             path = Path(path)
-            df = sorted(path.glob('*.csv'), key= lambda p: int(p.stem))
-            npz = sorted(path.glob('*.npz'), key= lambda p: int(p.stem))
+            df = sorted(path.glob('*.csv'), key=lambda p: int(p.stem))
+            npz = sorted(path.glob('*.npz'), key=lambda p: int(p.stem))
             assert len(df) == len(npz), "No. of tables and No. of masks fail to match"
             assert len(df) > 0, "Couldn't find anything to load"
             self._table_paths = df
@@ -635,7 +759,7 @@ class CrystalTracerApp(QMainWindow):
             self.label_detection.setText(msg)
             msg = f'Found {len(df)} detection instances.'
             print(msg)
-            QMessageBox.information(self, 'Success', msg)
+            # QMessageBox.information(self, 'Success', msg)
         except:
             msg = f'Detection results resolving failed.\n{path}'
             print(msg)
@@ -657,38 +781,12 @@ class CrystalTracerApp(QMainWindow):
             self._tracks_path = path
             self.label_tracks.setText(msg)
             self.group_tracks.setEnabled(True)
+            self.update_listview()
             msg = f'Tracking results loaded.'
             print(msg)
-            QMessageBox.information(self, 'Success', msg)
+            # QMessageBox.information(self, 'Success', msg)
         except:
             msg = f'Tracking results loading failed.\n{path}'
-            print(msg)
-            QMessageBox.warning(self, 'Warning', msg)
-
-    @Slot()
-    def on_open_recording(self):
-        path = QFileDialog.getExistingDirectory(self, 'Load recording files', self._init_recording_dir())
-        if path:
-            self.find_recording(path)
-
-    def find_recording(self, path):
-        try:
-            path = Path(path)
-            plots = sorted(path.glob('*.mp4'), key= lambda p: int(p.stem))
-            videos = sorted(path.glob('*.avi'), key= lambda p: int(p.stem))
-            assert len(plots) == len(videos), "No. of plots and No. of videos fail to match"
-            assert len(plots) > 0, "Couldn't find anything to load"
-            self._plot_paths = plots
-            self._video_paths = videos
-            msg = f'{path} ({len(plots)})'
-            self.label_recording.setText(msg)
-            self.group_plot.setEnabled(True)
-            self.group_video.setEnabled(True)
-            msg = f'Found {len(plots)} recording instances.'
-            print(msg)
-            QMessageBox.information(self, 'Success', msg)
-        except:
-            msg = f'Recording file resolving failed.\n{path}'
             print(msg)
             QMessageBox.warning(self, 'Warning', msg)
 
@@ -705,9 +803,60 @@ class CrystalTracerApp(QMainWindow):
             raise ValueError("Invalid button")
         self.stacked_widget.setCurrentIndex(index)
 
+    @Slot()
+    def run_batch(self):
+        if self._config_path is not None:
+            path = self._config_path
+        elif self._wkdir is not None:
+            path = self._wkdir
+        elif self._img_path is not None:
+            path = self._img_path.parent
+        else:
+            path = os.path.expanduser('~')
+        paths, _ = QFileDialog.getOpenFileNames(self, 'Choose images', path,
+                                                'Carl Zeiss Images (*.czi);;INI Files (*.ini)')
+        if len(paths) == 0:
+            return
+        n, ok = QInputDialog.getInt(self, "Input", "Enter the number of processors to use:",
+                                                 QThread.idealThreadCount(), 1, QThread.idealThreadCount())
+        if not ok:
+            return
+
+        response = QMessageBox.question(self, "Continue on existing results?", "Created locations will be skipped.",
+                                        QMessageBox.Yes | QMessageBox.No | QMessageBox.Cancel)
+
+        if response == QMessageBox.Cancel:
+            return
+
+        self.nproc_detection.setValue(n)
+        self.nproc_recording.setValue(n)
+
+        for p in paths:
+            p = Path(p)
+            if p.suffix == '.czi':
+                self.import_image(p)
+                self._init_wkdir(p.parent / p.stem)
+            elif p.suffix == '.ini':
+                self._load_config(p)
+            if response == QMessageBox.Yes and Path(self.save_dir_detection.text()).exists() or \
+                    self.task_detection(msgbox=False, modal=True):
+                self.resolve_detection(self.save_dir_detection.text())
+                if response == QMessageBox.Yes and Path(self.save_path_tracking.text()).exists() or \
+                        self.task_tracking(msgbox=False, modal=True):
+                    self.load_tracking(self.save_path_tracking.text())
+                    if response == QMessageBox.Yes and Path(self.save_dir_recording.text()).exists() or \
+                            self.task_recording(msgbox=False, modal=True):
+                        self._save_config(self._wkdir / 'config.ini')
+                        continue
+            print(f'{p} faild.')
+
+
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     window = CrystalTracerApp()
     window.show()
+    with open("Ubuntu.qss", "r") as f:
+        _style = f.read()
+        app.setStyleSheet(_style)
     sys.exit(app.exec())

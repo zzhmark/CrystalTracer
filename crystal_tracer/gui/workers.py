@@ -104,12 +104,13 @@ class TrackingTask2(TrackingTask):
 
 class PreviewRecordingTask(QThread):
     def __init__(self, track: list[tuple[int, int]], img_path: Path, table_paths: list[Path], mask_paths: list[Path],
-                 win_rad: int):
+                 win_rad: int, mpf: float):
         super().__init__()
         self.track = track
         self.img_path = img_path
         self.table_paths = table_paths
         self.mask_paths = mask_paths
+        self.mpf = mpf
         self.win_rad = win_rad
         self.tables = None
         self.x_data = None
@@ -118,12 +119,10 @@ class PreviewRecordingTask(QThread):
 
     def run(self):
         self.tables = list(asyncio.run(load_all_tables(self.table_paths)))
-        x, y = [], []
+        self.x_data, self.y_data = [], []
         for i, j in self.track:
-            x.append(i)
-            y.append(self.tables[x[-1]].at[j, 'area'])
-        self.x_data = np.linspace(x[0], x[-1], x[-1] - x[0] + 1)
-        self.y_data = np.interp(self.x_data, x, y)
+            self.x_data.append(i * self.mpf)
+            self.y_data.append(self.tables[i].at[j, 'area'])
         self.stack = make_video(self.track, None, self.img_path, self.table_paths, self.mask_paths,
                                 self.win_rad, 1)
 
@@ -132,7 +131,7 @@ class RecordingTask(QThread):
     increment = Signal()
 
     def __init__(self, max_thread: int, tracks: list[list[tuple[int, int]]], save_dir: Path, img_path: Path,
-                 table_paths: list[Path], mask_paths: list[Path], win_rad: int, frame_rate: float):
+                 table_paths: list[Path], mask_paths: list[Path], win_rad: int, frame_rate: float, min_per_frame: float):
         super().__init__()
         self.max_thread = max_thread
         self.tracks = tracks
@@ -143,27 +142,29 @@ class RecordingTask(QThread):
         self.win_rad = win_rad
         self.frame_rate = frame_rate
         self.tables = None
+        self.mpf = min_per_frame
 
     def _plot_area(self, i_track):
         path = self._get_name(i_track, '.csv')
         x, y = [], []
         for i, j in self.tracks[i_track]:
             x.append(i)
-            y.append(self.tables[x[-1]].at[j, 'area'])
+            y.append(self.tables[i].at[j, 'area'])
         pd.DataFrame({
-            'time': x,
+            'timestamp': x,
+            'time': np.array(x) * self.mpf,
             'area': y
         }).to_csv(path, index=False)
 
-        time_interp = np.linspace(x[0], x[-1], x[-1] - x[0] + 1)
+        time_interp = np.linspace(x[0], x[-1], x[-1] - x[0] + 1) * self.mpf
         area_interp = np.interp(time_interp, x, y)
 
         fig, ax = plt.subplots()
         line, = ax.plot([], [])
-        ax.set_xlabel('Time elapse')
-        ax.set_ylabel('Crystal area')
-        ax.set_xlim(0, max(x))
-        ax.set_ylim(0, max(y) * 1.25)
+        ax.set_xlabel('Time Elapse (min)')
+        ax.set_ylabel('Crystal Area (pixel)')
+        ax.set_xlim(0, max(time_interp))
+        ax.set_ylim(0, max(area_interp) * 1.25)
         ax.spines['top'].set_visible(False)
         ax.spines['right'].set_visible(False)
         ax.set_aspect(1 / ax.get_data_ratio(), adjustable='box')
@@ -230,18 +231,7 @@ class WalkTask(QThread):
         self.walks = None
 
     def run(self):
-
-        async def async_read_csv(path):
-            async with aiofiles.open(path, 'r') as f:
-                content = await f.read()
-                return pd.read_csv(StringIO(content))
-
-        async def load_all_tables():
-            coroutines = [async_read_csv(path) for path in self.table_paths]
-            return await asyncio.gather(*coroutines)
-
-        tables = asyncio.run(load_all_tables())
-
+        tables = list(asyncio.run(load_all_tables(self.table_paths)))
         self.walks = []
         tot = len(tables)
         self.timescale = np.linspace(0, tot - 1, tot)

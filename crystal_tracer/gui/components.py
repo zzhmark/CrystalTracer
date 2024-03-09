@@ -63,8 +63,8 @@ class AnimatedLine2D(AnimatedComponent):
         self.y_data = y_data
         self.ax.set_aspect('equal')
         self.line, = self.ax.plot([], [])
-        self.ax.set_xlabel('Time elapse')
-        self.ax.set_ylabel('Crystal area')
+        self.ax.set_xlabel('Time Elapse (min)')
+        self.ax.set_ylabel('Crystal Area (pixel)')
         self.ax.set_xlim(0, max(x_data))
         self.ax.set_ylim(0, max(y_data) * 1.25)
         self.ax.set_aspect(1 / self.ax.get_data_ratio(), adjustable='box')

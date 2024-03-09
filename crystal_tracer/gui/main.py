@@ -127,7 +127,7 @@ class CrystalTracerApp(QMainWindow):
         progress.setModal(True)
         progress.show()
         task = PreviewRecordingTask(self._tracks[item.data(Qt.UserRole)], self._img_path, self._table_paths,
-                                    self._mask_paths, self.win_rad.value())
+                                    self._mask_paths, self.win_rad.value(), self.min_per_frame.value())
         task.finished.connect(progress.close)
         progress.canceled.connect(task.quit)
         task.start()
@@ -226,7 +226,8 @@ class CrystalTracerApp(QMainWindow):
             section = config['parameters.recording']
             self.win_rad.setValue(int(section['win_rad'])),
             self.frame_rate.setValue(float(section['frame_rate'])),
-            self.elapse_thr.setValue(int(section['elapse_thr']))
+            self.elapse_thr.setValue(int(section['elapse_thr'])),
+            self.min_per_frame.setValue(float(section['min_per_frame']))
 
         self._config_path = Path(path)
 
@@ -302,7 +303,8 @@ class CrystalTracerApp(QMainWindow):
         config['parameters.recording'] = {
             'win_rad': self.win_rad.value(),
             'frame_rate': self.frame_rate.value(),
-            'elapse_thr': self.elapse_thr.value()
+            'elapse_thr': self.elapse_thr.value(),
+            'min_per_frame': self.min_per_frame.value()
         }
 
         with open(path, 'w', encoding='utf-8') as f:
@@ -587,7 +589,8 @@ class CrystalTracerApp(QMainWindow):
         self.recording_progress.setMaximum(len(tracks))
         self.recording_progress.setValue(0)
         self.task = RecordingTask(self.nproc_recording.value(), tracks, p, self._img_path, self._table_paths,
-                                  self._mask_paths, self.win_rad.value(), self.frame_rate.value())
+                                  self._mask_paths, self.win_rad.value(), self.frame_rate.value(),
+                                  self.min_per_frame.value())
         if modal:
             progress = QProgressDialog('Performing recording..', 'Cancel', 0, 0, self)
             progress.setWindowFlags(progress.windowFlags() & ~Qt.WindowCloseButtonHint)

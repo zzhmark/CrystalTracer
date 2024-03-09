@@ -156,8 +156,9 @@ class RecordingTask(QThread):
             'area': y
         }).to_csv(path, index=False)
 
-        time_interp = np.linspace(x[0], x[-1], x[-1] - x[0] + 1) * self.mpf
+        time_interp = np.linspace(x[0], x[-1], x[-1] - x[0] + 1)
         area_interp = np.interp(time_interp, x, y)
+        time_interp *= self.mpf
 
         fig, ax = plt.subplots()
         line, = ax.plot([], [])

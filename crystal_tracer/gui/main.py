@@ -167,7 +167,7 @@ class CrystalTracerApp(QMainWindow):
         path = QFileDialog.getOpenFileName(self, 'Load configuration', str(path), 'INI files (*.ini)')[0]
         if not path:
             return
-        self.load_config(path)
+        self._load_config(path)
 
     def _load_config(self, path):
         config = configparser.ConfigParser()

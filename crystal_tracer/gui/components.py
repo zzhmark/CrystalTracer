@@ -67,6 +67,7 @@ class AnimatedLine2D(AnimatedComponent):
         self.ax.set_ylabel('Crystal area')
         self.ax.set_xlim(0, max(x_data))
         self.ax.set_ylim(0, max(y_data) * 1.25)
+        self.ax.set_aspect(1 / self.ax.get_data_ratio(), adjustable='box')
 
         def init():
             self.line.set_data([], [])

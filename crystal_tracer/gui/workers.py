@@ -159,7 +159,6 @@ class RecordingTask(QThread):
         area_interp = np.interp(time_interp, x, y)
 
         fig, ax = plt.subplots()
-        ax.set_aspect('equal')
         line, = ax.plot([], [])
         ax.set_xlabel('Time elapse')
         ax.set_ylabel('Crystal area')
@@ -167,6 +166,7 @@ class RecordingTask(QThread):
         ax.set_ylim(0, max(y) * 1.25)
         ax.spines['top'].set_visible(False)
         ax.spines['right'].set_visible(False)
+        ax.set_aspect(1 / ax.get_data_ratio(), adjustable='box')
 
         def init():
             line.set_data([], [])

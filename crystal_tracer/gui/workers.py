@@ -123,6 +123,7 @@ class PreviewRecordingTask(QThread):
         for i, j in self.track:
             self.x_data.append(i * self.mpf)
             self.y_data.append(self.tables[i].at[j, 'area'])
+        self.x_data = [i - self.x_data[0] for i in self.x_data]
         self.stack = make_video(self.track, None, self.img_path, self.table_paths, self.mask_paths,
                                 self.win_rad, 1)
 
@@ -150,15 +151,18 @@ class RecordingTask(QThread):
         for i, j in self.tracks[i_track]:
             x.append(i)
             y.append(self.tables[i].at[j, 'area'])
+        t = np.array(x) * self.mpf
+        t -= t[0]
         pd.DataFrame({
             'timestamp': x,
-            'time': np.array(x) * self.mpf,
+            'time': t,
             'area': y
         }).to_csv(path, index=False)
 
         time_interp = np.linspace(x[0], x[-1], x[-1] - x[0] + 1)
         area_interp = np.interp(time_interp, x, y)
         time_interp *= self.mpf
+        time_interp -= time_interp[0]
 
         fig, ax = plt.subplots()
         line, = ax.plot([], [])

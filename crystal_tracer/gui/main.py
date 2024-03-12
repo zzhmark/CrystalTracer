@@ -809,7 +809,7 @@ class CrystalTracerApp(QMainWindow):
     @Slot()
     def run_batch(self):
         if self._config_path is not None:
-            path = self._config_path
+            path = self._config_path.parent
         elif self._wkdir is not None:
             path = self._wkdir
         elif self._img_path is not None:
